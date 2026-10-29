@@ -14,6 +14,9 @@
 
 #include "pegel_packet.h"
 #include "secrets_receiver.h"
+#include "uploader.h"
+
+#define STATUS_INTERVAL_MS  60000
 
 struct Peer {
   mesh::Identity id;
@@ -26,6 +29,7 @@ struct Peer {
 };
 
 static Preferences prefs;
+static uint32_t rx_ok = 0, rx_rejected = 0;
 
 class ReceiverMesh : public mesh::Mesh {
   Peer peers[PEGEL_SENDER_COUNT];
@@ -44,10 +48,13 @@ class ReceiverMesh : public mesh::Mesh {
       p.last_counter = r.counter;
       p.has_last = true;
       saveCounter(i);
+      rx_ok++;
+      uploader_push(i, millis(), r.age_s, r.level_mm);
       Serial.printf("{\"sender\":\"%s\",\"counter\":%lu,\"level_mm\":%u,\"age_s\":%u,\"snr\":%.2f,\"rssi\":%.1f}\n",
                     PEGEL_SENDER_NAMES[i], (unsigned long)r.counter, r.level_mm, r.age_s, snr, rssi);
       return;
     }
+    rx_rejected++;
     Serial.println("rejected: unknown key, bad MAC or replayed counter");
   }
 
@@ -136,9 +143,19 @@ void setup() {
   }
   fast_rng.begin(radio_driver.getRngSeed());
   the_mesh.begin();
+  uploader_begin();
 }
 
 void loop() {
   the_mesh.loop();
   rtc_clock.tick();
+
+  static uint32_t next_status = 0;
+  if ((int32_t)(millis() - next_status) >= 0) {
+    next_status = millis() + STATUS_INTERVAL_MS;
+    char up[96];
+    uploader_status(up, sizeof(up));
+    Serial.printf("status: up %lus rx_ok=%lu rx_rejected=%lu %s\n", (unsigned long)(millis() / 1000),
+                  (unsigned long)rx_ok, (unsigned long)rx_rejected, up);
+  }
 }

@@ -53,7 +53,7 @@ def main():
 
     SECRETS.mkdir(exist_ok=True)
     if KEYS_JSON.exists() and not args.force:
-        keys = json.loads(KEYS_JSON.read_text())
+        keys = json.loads(KEYS_JSON.read_text(encoding="utf-8"))
     else:
         keys = {"receiver": new_identity(), "senders": {}}
     for name in args.senders:
@@ -61,7 +61,7 @@ def main():
             ident = new_identity()
             ident["hmac"] = os.urandom(32).hex()
             keys["senders"][name] = ident
-    KEYS_JSON.write_text(json.dumps(keys, indent=2))
+    KEYS_JSON.write_text(json.dumps(keys, indent=2), encoding="utf-8")
 
     senders = keys["senders"]
     names = list(senders)
@@ -75,7 +75,8 @@ def main():
             + f'#define PEGEL_SENDER_PRV    "{s["prv"]}"\n'
             + f'#define PEGEL_SENDER_PUB    "{s["pub"]}"\n'
             + f'#define PEGEL_RECEIVER_PUB  "{rx["pub"]}"\n\n'
-            + f"static const uint8_t PEGEL_HMAC_KEY[32] = {c_bytes(s['hmac'])};\n"
+            + f"static const uint8_t PEGEL_HMAC_KEY[32] = {c_bytes(s['hmac'])};\n",
+            encoding="utf-8",
         )
 
     (SECRETS / "secrets_receiver.h").write_text(
@@ -88,18 +89,28 @@ def main():
         + "static const char* const PEGEL_SENDER_PUBS[PEGEL_SENDER_COUNT] = {\n"
         + "".join(f'  "{senders[n]["pub"]}",\n' for n in names) + "};\n"
         + "static const uint8_t PEGEL_HMAC_KEYS[PEGEL_SENDER_COUNT][32] = {\n"
-        + "".join(f"  {c_bytes(senders[n]['hmac'])},\n" for n in names) + "};\n"
+        + "".join(f"  {c_bytes(senders[n]['hmac'])},\n" for n in names) + "};\n",
+        encoding="utf-8",
     )
 
     wifi = SECRETS / "receiver_wifi.h"
     if not wifi.exists():
+        ids = ", ".join(f'"pegel-mesh-{n.lower()}"' for n in names)
+        labels = ", ".join(f'"Pegel {n} (Test)"' for n in names)
+        zeros = ", ".join("0.0f" for _ in names)
         wifi.write_text(
             header
-            + "// Von Hand ausfüllen.\n"
+            + "// Von Hand ausfüllen. Die Listen folgen der Sender-Reihenfolge aus secrets_receiver.h.\n"
             + '#define PEGEL_WIFI_SSID   ""\n'
             + '#define PEGEL_WIFI_PASS   ""\n'
-            + '#define PEGEL_API_URL     ""\n'
-            + '#define PEGEL_API_KEY     ""\n'
+            + '#define PEGEL_API_URL     ""   // z. B. "https://example.org", ohne / am Ende\n'
+            + '#define PEGEL_API_KEY     ""   // aus Admin > API-Keys\n'
+            + '#define PEGEL_API_CA      ""   // optional: Root-Zertifikat (PEM); leer = Zertifikat nicht geprüft\n\n'
+            + f"static const char* const PEGEL_STATION_IDS[PEGEL_SENDER_COUNT] = {{ {ids} }};\n"
+            + f"static const char* const PEGEL_STATION_NAMES[PEGEL_SENDER_COUNT] = {{ {labels} }};\n"
+            + f"static const float PEGEL_STATION_LAT[PEGEL_SENDER_COUNT] = {{ {zeros} }};\n"
+            + f"static const float PEGEL_STATION_LON[PEGEL_SENDER_COUNT] = {{ {zeros} }};\n",
+            encoding="utf-8",
         )
 
     print(f"receiver pub {rx['pub']}")
