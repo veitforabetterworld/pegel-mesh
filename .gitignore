@@ -2,3 +2,4 @@ secrets/
 .pio/
 .vscode/
 __pycache__/
+passwords.txt

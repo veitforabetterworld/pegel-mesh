@@ -32,6 +32,20 @@ using namespace Adafruit_LittleFS_Namespace;
 
 static bool due(uint32_t now, uint32_t t) { return (int32_t)(now - t) >= 0; }
 
+// Log über USB, ohne zu blockieren: ist ein Host verbunden, der nicht mitliest, wird die Zeile verworfen,
+// statt den Sender anzuhalten (sonst bleibt der Sendetakt stehen).
+static void logf(const char* fmt, ...) {
+  char buf[128];
+  va_list args;
+  va_start(args, fmt);
+  int n = vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  if (n <= 0 || !Serial) return;
+  if (n >= (int)sizeof(buf)) n = sizeof(buf) - 1;
+  if (Serial.availableForWrite() < n) return;
+  Serial.write((const uint8_t*)buf, n);
+}
+
 static uint32_t loadCounter() {
   uint32_t c = 0;
   auto f = InternalFS.open(CTR_FILE, FILE_O_READ);
@@ -62,6 +76,7 @@ class SenderMesh : public mesh::Mesh {
   uint32_t next_send = 0;
   uint32_t next_check = 0;
   uint32_t reply_deadline = 0;
+  uint32_t next_status = 0;
   bool awaiting_reply = false;
 
   uint16_t measureLevel() {
@@ -85,7 +100,7 @@ class SenderMesh : public mesh::Mesh {
     if (!pkt) return;
     // Ohne Pfad als Direktpaket ohne Hops: kommt nur an, wenn der Empfänger in Funkreichweite ist.
     sendDirect(pkt, out_path, have_path ? out_path_len : 0);
-    Serial.printf("TX #%lu level=%u mm %s\n", (unsigned long)r.counter, r.level_mm,
+    logf("TX #%lu level=%u mm %s\n", (unsigned long)r.counter, r.level_mm,
                   have_path ? "(direct path)" : "(zero hop)");
   }
 
@@ -98,11 +113,11 @@ class SenderMesh : public mesh::Mesh {
     if (have_path) {
       sendDirect(pkt, out_path, out_path_len);
       reply_deadline = millis() + DIRECT_REPLY_TIMEOUT_MS;
-      Serial.println("REQ direct (path check)");
+      logf("REQ direct (path check)\n");
     } else {
       sendFlood(pkt);
       reply_deadline = millis() + FLOOD_REPLY_TIMEOUT_MS;
-      Serial.println("REQ flood (path discovery)");
+      logf("REQ flood (path discovery)\n");
     }
     awaiting_reply = true;
   }
@@ -122,7 +137,7 @@ protected:
     have_path = true;
     awaiting_reply = false;
     next_check = millis() + PATH_CHECK_INTERVAL_MS;
-    Serial.printf("path to receiver learned: %u hop(s)\n", (unsigned)(path_len & 63));
+    logf("path to receiver learned: %u hop(s)\n", (unsigned)(path_len & 63));
     return true;   // Mesh schickt dem Empfänger daraufhin den Rückweg
   }
 
@@ -130,7 +145,7 @@ protected:
                       uint8_t* data, size_t len) override {
     if (type == PAYLOAD_TYPE_RESPONSE) {
       awaiting_reply = false;
-      Serial.println("receiver answered, path ok");
+      logf("receiver answered, path ok\n");
     }
   }
 
@@ -151,7 +166,7 @@ public:
     uint32_t now = millis();
     next_check = now + 3000;
     next_send = now + 5000;
-    Serial.printf("pegel sender %s, interval %u s, counter %lu\n", PEGEL_SENDER_NAME, PEGEL_INTERVAL_S,
+    logf("pegel sender %s, interval %u s, counter %lu\n", PEGEL_SENDER_NAME, PEGEL_INTERVAL_S,
                   (unsigned long)counter);
   }
 
@@ -161,8 +176,8 @@ public:
 
     if (awaiting_reply && due(now, reply_deadline)) {
       awaiting_reply = false;
-      if (have_path) Serial.println("no answer on path, path dropped");
-      else Serial.println("no answer to discovery");
+      if (have_path) logf("no answer on path, path dropped\n");
+      else logf("no answer to discovery\n");
       have_path = false;
       next_check = now + DISCOVER_RETRY_MS;
     }
@@ -173,6 +188,11 @@ public:
     if (due(now, next_send)) {
       sendReading();
       next_send += PEGEL_INTERVAL_S * 1000UL;
+    }
+    if (due(now, next_status)) {
+      next_status = now + 30000;
+      logf("status: up %lus counter=%lu path=%s\n", (unsigned long)(now / 1000), (unsigned long)counter,
+                    have_path ? "yes" : "no");
     }
   }
 };
@@ -185,7 +205,7 @@ void setup() {
   Serial.begin(115200);
   board.begin();
   if (!radio_init()) {
-    while (1) { Serial.println("radio init failed"); delay(2000); }
+    while (1) { logf("radio init failed\n"); delay(2000); }
   }
   fast_rng.begin(radio_driver.getRngSeed());
   InternalFS.begin();

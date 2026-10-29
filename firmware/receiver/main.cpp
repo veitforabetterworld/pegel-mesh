@@ -137,7 +137,10 @@ ReceiverMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables);
 
 void setup() {
   Serial.begin(115200);
+  delay(2000);   // USB-CDC: dem Host Zeit zum Verbinden lassen, sonst gehen die Startmeldungen verloren
+  Serial.println("pegel receiver booting");
   board.begin();
+  Serial.println("board ok, radio init...");
   if (!radio_init()) {
     while (1) { Serial.println("radio init failed"); delay(2000); }
   }
