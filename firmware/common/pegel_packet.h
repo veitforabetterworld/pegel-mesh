@@ -1,7 +1,7 @@
 #pragma once
 // Pegel-Messpaket: 13 Byte, per HMAC-SHA256 (gekürzt) authentisiert, nicht verschlüsselt.
 //
-//   Byte  0..1   level_mm   uint16 LE   Pegel in mm
+//   Byte  0..1   level_mm   uint16 LE   Pegel in mm, oder ab 0xFF00 ein Fehlercode (siehe unten)
 //   Byte  2..3   ctr_lo     uint16 LE   untere 16 Bit des 32-Bit-Zählers
 //   Byte  4      age_s      uint8       Sekunden zwischen Messung und Senden
 //   Byte  5..12  mac        8 Byte      HMAC-SHA256(key, "PGL1" | ctr32 | level | age)[0..8]
@@ -15,6 +15,11 @@
 #include <SHA256.h>
 
 #define PEGEL_PKT_LEN  13
+
+// level_mm ab PEGEL_STATUS_BASE ist kein Pegel, sondern ein Fehlercode des Geräts (1..255):
+// level_mm = PEGEL_STATUS_BASE + Code. Pegel reichen damit bis 65,279 m.
+#define PEGEL_STATUS_BASE  0xFF00
+#define PEGEL_LEVEL_MAX_MM (PEGEL_STATUS_BASE - 1)
 #define PEGEL_MAC_LEN  8
 #define PEGEL_KEY_LEN  32
 

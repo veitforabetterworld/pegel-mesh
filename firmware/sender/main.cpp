@@ -85,25 +85,27 @@ class SenderMesh : public mesh::Mesh {
   uint32_t next_status = 0;
   bool awaiting_reply = false;
 
-  bool measureLevel(uint16_t& level_mm) {
+  /** LEVEL_OK with the level, or an error code of level_sensor.h. */
+  uint8_t measureLevel(uint16_t& level_mm) {
 #if PEGEL_SENSOR
     return level_sensor_read_mm(level_mm);
 #else
     // Dummywert ohne Sonde: 1,50 m mit 6-Stunden-Welle ±30 cm und etwas Rauschen.
     float t = millis() / 1000.0f;
     float level = 1500.0f + 300.0f * sinf(2.0f * PI * t / (6.0f * 3600.0f)) + (float)random(-5, 6);
-    level_mm = (uint16_t)constrain(level, 0.0f, 65535.0f);
-    return true;
+    level_mm = (uint16_t)constrain(level, 0.0f, (float)PEGEL_LEVEL_MAX_MM);
+    return LEVEL_OK;
 #endif
   }
 
   void sendReading() {
     uint32_t measured_at = millis();
     PegelReading r;
-    if (!measureLevel(r.level_mm)) {
-      // Ohne gültigen Wert wird nichts gesendet; auf dem Server fehlt dann dieser Messpunkt.
-      logf("sensor read failed\n");
-      return;
+    uint8_t status = measureLevel(r.level_mm);
+    if (status != LEVEL_OK) {
+      // Statt eines Messwerts geht der Fehlercode über Funk; die Pegelseite zeigt ihn als Gerätestatus.
+      r.level_mm = PEGEL_STATUS_BASE + status;
+      logf("sensor error %u\n", status);
     }
     r.counter = ++counter;
     if (counter % CTR_SAVE_STEP == 0) saveCounter(counter);

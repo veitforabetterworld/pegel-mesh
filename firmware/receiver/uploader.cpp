@@ -1,4 +1,5 @@
 #include "uploader.h"
+#include "pegel_packet.h"
 
 #include <Arduino.h>
 #include <HTTPClient.h>
@@ -110,7 +111,10 @@ static bool uploadBatch() {
   for (int k = 0; k < n; k++) {
     time_t measured = now - (time_t)((now_ms - batch[k].received_ms) / 1000) - batch[k].age_s;
     if (k) body += ",";
-    body += "{\"observed_at\":\"" + isoTime(measured) + "\",\"water_level\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
+    body += "{\"observed_at\":\"" + isoTime(measured) + "\",";
+    // Ab PEGEL_STATUS_BASE meldet der Sender einen Fehlercode statt eines Pegels.
+    if (batch[k].level_mm >= PEGEL_STATUS_BASE) body += "\"status\":" + String(batch[k].level_mm - PEGEL_STATUS_BASE) + "}";
+    else body += "\"water_level\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
   }
   body += "]}";
 

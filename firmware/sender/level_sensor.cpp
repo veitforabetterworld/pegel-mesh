@@ -1,4 +1,5 @@
 #include "level_sensor.h"
+#include "pegel_packet.h"
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -68,10 +69,11 @@ static bool readRegister(uint16_t reg, uint16_t& value) {
   return true;
 }
 
-bool level_sensor_read_mm(uint16_t& level_mm) {
+uint8_t level_sensor_read_mm(uint16_t& level_mm) {
   uint16_t cm;
-  if (!readRegister(PEGEL_LEVEL_REGISTER, cm) || cm > PEGEL_LEVEL_MAX_CM) return false;
+  if (!readRegister(PEGEL_LEVEL_REGISTER, cm)) return LEVEL_NO_RESPONSE;
+  if (cm > PEGEL_LEVEL_MAX_CM) return LEVEL_OUT_OF_RANGE;
   long mm = (long)cm * 10 + PEGEL_SENSOR_OFFSET_MM;
-  level_mm = (uint16_t)constrain(mm, 0L, 65535L);
-  return true;
+  level_mm = (uint16_t)constrain(mm, 0L, (long)PEGEL_LEVEL_MAX_MM);
+  return LEVEL_OK;
 }
