@@ -41,8 +41,9 @@ void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint8_t age_s, uint
 }
 
 void uploader_status(char* buf, int len) {
-  snprintf(buf, len, "wifi=%s queued=%d uploaded=%lu dropped=%lu last_http=%d",
-           WiFi.status() == WL_CONNECTED ? "up" : "down", queued, (unsigned long)uploaded,
+  // wl_status_t: 1 SSID not found, 4 connect failed (password), 6 disconnected.
+  snprintf(buf, len, "wifi=%s(%d) queued=%d uploaded=%lu dropped=%lu last_http=%d",
+           WiFi.status() == WL_CONNECTED ? "up" : "down", (int)WiFi.status(), queued, (unsigned long)uploaded,
            (unsigned long)dropped, last_http);
 }
 
@@ -135,11 +136,37 @@ static bool uploadBatch() {
   return true;
 }
 
+/** Diagnosis while not connected: how many networks, the strongest signal, and whether ours is among them. */
+static void logScan() {
+  int found = WiFi.scanNetworks();
+  int ours = -1, oursIgnoringCase = -1, best = -127;
+  for (int i = 0; i < found; i++) {
+    if (WiFi.RSSI(i) > best) best = WiFi.RSSI(i);
+    if (WiFi.SSID(i) == PEGEL_WIFI_SSID) ours = i;
+    if (WiFi.SSID(i).equalsIgnoreCase(PEGEL_WIFI_SSID)) oursIgnoringCase = i;
+  }
+  if (ours >= 0) {
+    Serial.printf("wifi scan: %d networks, ours on channel %d with %d dBm\n", found, WiFi.channel(ours), WiFi.RSSI(ours));
+  } else if (oursIgnoringCase >= 0) {
+    Serial.printf("wifi scan: %d networks, ours only with other upper/lower case (%d dBm)\n", found, WiFi.RSSI(oursIgnoringCase));
+  } else {
+    Serial.printf("wifi scan: %d networks, strongest %d dBm, ours not among them\n", found, found > 0 ? best : 0);
+  }
+  WiFi.scanDelete();
+}
+
 static void uploaderTask(void*) {
   WiFi.mode(WIFI_STA);
+  logScan();
   WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
   configTime(0, 0, "pool.ntp.org", "time.google.com");
+  uint32_t next_scan = millis() + 60000;
   for (;;) {
+    if (WiFi.status() != WL_CONNECTED && (int32_t)(millis() - next_scan) >= 0) {
+      next_scan = millis() + 60000;
+      logScan();
+      WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
+    }
     if (WiFi.status() != WL_CONNECTED || time(nullptr) < TIME_VALID_AFTER) {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
