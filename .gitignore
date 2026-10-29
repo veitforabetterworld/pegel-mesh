@@ -1,0 +1,4 @@
+secrets/
+.pio/
+.vscode/
+__pycache__/
