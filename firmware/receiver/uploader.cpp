@@ -70,14 +70,15 @@ static int request(const char* method, const String& path, const String& body) {
   return code;
 }
 
-// Legt die Messstelle an bzw. aktualisiert sie; ohne Koordinaten (0/0) muss sie schon existieren.
+// Legt die Messstelle privat an, falls es sie noch nicht gibt (409 = ID schon vergeben, dann besteht sie).
+// Ohne Koordinaten (0/0) muss sie schon existieren, angelegt per API oder von Hand.
 static bool ensureStation(int i) {
   if (PEGEL_STATION_LAT[i] == 0.0f && PEGEL_STATION_LON[i] == 0.0f) return true;
   char body[256];
-  snprintf(body, sizeof(body), "{\"name\":\"%s\",\"lat\":%.6f,\"lon\":%.6f}", PEGEL_STATION_NAMES[i],
-           PEGEL_STATION_LAT[i], PEGEL_STATION_LON[i]);
-  int code = request("PUT", String("/v1/ingest/stations/") + PEGEL_STATION_IDS[i], body);
-  return code >= 200 && code < 300;
+  snprintf(body, sizeof(body), "{\"slug\":\"%s\",\"name\":\"%s\",\"latitude\":%.6f,\"longitude\":%.6f}",
+           PEGEL_STATION_IDS[i], PEGEL_STATION_NAMES[i], PEGEL_STATION_LAT[i], PEGEL_STATION_LON[i]);
+  int code = request("POST", "/v1/stations", body);
+  return (code >= 200 && code < 300) || code == 409;
 }
 
 static String isoTime(time_t t) {
@@ -107,15 +108,15 @@ static bool uploadBatch() {
 
   time_t now = time(nullptr);
   uint32_t now_ms = millis();
-  String body = String("{\"station\":\"") + PEGEL_STATION_IDS[sender] + "\",\"values\":[";
+  String body = "{\"observations\":[";
   for (int k = 0; k < n; k++) {
     time_t measured = now - (time_t)((now_ms - batch[k].received_ms) / 1000) - batch[k].age_s;
     if (k) body += ",";
-    body += "{\"t\":\"" + isoTime(measured) + "\",\"level_m\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
+    body += "{\"observed_at\":\"" + isoTime(measured) + "\",\"water_level\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
   }
   body += "]}";
 
-  int code = request("POST", "/v1/ingest/measurements", body);
+  int code = request("POST", String("/v1/stations/") + PEGEL_STATION_IDS[sender] + "/observations", body);
   if (code < 200 || code >= 300) return false;
 
   // Die gesendeten Einträge entfernen (in der Zwischenzeit können neue hinten dazugekommen sein).
@@ -153,7 +154,7 @@ static void uploaderTask(void*) {
 
 void uploader_begin() {
   lock = xSemaphoreCreateMutex();
-  if (strlen(PEGEL_WIFI_SSID) == 0 || strlen(PEGEL_API_URL) == 0) {
+  if (strlen(PEGEL_WIFI_SSID) == 0 || strlen(PEGEL_API_URL) == 0 || strlen(PEGEL_API_KEY) == 0) {
     Serial.println("uploader off: WLAN/API in secrets/receiver_wifi.h nicht eingetragen");
     return;
   }

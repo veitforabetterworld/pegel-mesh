@@ -103,7 +103,7 @@ def main():
             + "// Von Hand ausfüllen. Die Listen folgen der Sender-Reihenfolge aus secrets_receiver.h.\n"
             + '#define PEGEL_WIFI_SSID   ""\n'
             + '#define PEGEL_WIFI_PASS   ""\n'
-            + '#define PEGEL_API_URL     ""   // z. B. "https://example.org", ohne / am Ende\n'
+            + '#define PEGEL_API_URL     "https://hochwasserdienst.plenivo.de/api"   // ohne / am Ende\n'
             + '#define PEGEL_API_KEY     ""   // aus Admin > API-Keys\n'
             + '#define PEGEL_API_CA      ""   // optional: Root-Zertifikat (PEM); leer = Zertifikat nicht geprüft\n\n'
             + f"static const char* const PEGEL_STATION_IDS[PEGEL_SENDER_COUNT] = {{ {ids} }};\n"
