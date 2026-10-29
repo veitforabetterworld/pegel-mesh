@@ -26,7 +26,6 @@ static int queued = 0;
 static uint32_t dropped = 0;
 static uint32_t uploaded = 0;
 static int last_http = 0;
-static bool station_ready[PEGEL_SENDER_COUNT];
 static SemaphoreHandle_t lock;
 
 void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint8_t age_s, uint16_t level_mm) {
@@ -71,10 +70,13 @@ static int request(const char* method, const String& path, const String& body) {
   return code;
 }
 
-// Legt die Messstelle privat an, falls es sie noch nicht gibt (409 = ID schon vergeben, dann besteht sie).
-// Ohne Koordinaten (0/0) muss sie schon existieren, angelegt per API oder von Hand.
-static bool ensureStation(int i) {
-  if (PEGEL_STATION_LAT[i] == 0.0f && PEGEL_STATION_LON[i] == 0.0f) return true;
+// Legt die Messstelle privat an (der Key braucht stations.write); 409 = ID schon vergeben, dann besteht sie.
+// Ohne Koordinaten (0/0) muss sie schon existieren, angelegt im Konto oder per API.
+static bool createStation(int i) {
+  if (PEGEL_STATION_LAT[i] == 0.0f && PEGEL_STATION_LON[i] == 0.0f) {
+    Serial.printf("station %s fehlt, ohne Koordinaten in receiver_wifi.h wird sie nicht angelegt\n", PEGEL_STATION_IDS[i]);
+    return false;
+  }
   char body[256];
   snprintf(body, sizeof(body), "{\"slug\":\"%s\",\"name\":\"%s\",\"latitude\":%.6f,\"longitude\":%.6f}",
            PEGEL_STATION_IDS[i], PEGEL_STATION_NAMES[i], PEGEL_STATION_LAT[i], PEGEL_STATION_LON[i]);
@@ -102,11 +104,6 @@ static bool uploadBatch() {
   xSemaphoreGive(lock);
   if (n == 0) return false;
 
-  if (!station_ready[sender]) {
-    station_ready[sender] = ensureStation(sender);
-    if (!station_ready[sender]) return false;
-  }
-
   time_t now = time(nullptr);
   uint32_t now_ms = millis();
   String body = "{\"observations\":[";
@@ -117,7 +114,10 @@ static bool uploadBatch() {
   }
   body += "]}";
 
-  int code = request("POST", String("/v1/stations/") + PEGEL_STATION_IDS[sender] + "/observations", body);
+  String path = String("/v1/stations/") + PEGEL_STATION_IDS[sender] + "/observations";
+  int code = request("POST", path, body);
+  // 404: die Station gibt es (für diesen Key) noch nicht. Einmal anlegen und erneut senden.
+  if (code == 404 && createStation(sender)) code = request("POST", path, body);
   if (code < 200 || code >= 300) return false;
 
   // Die gesendeten Einträge entfernen (in der Zwischenzeit können neue hinten dazugekommen sein).
