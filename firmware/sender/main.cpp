@@ -14,9 +14,15 @@
 #include <target.h>
 
 #include "pegel_packet.h"
+#include "level_sensor.h"
 #include PEGEL_SECRETS
 
 using namespace Adafruit_LittleFS_Namespace;
+
+// 1: Pegel von der RS485-Sonde (level_sensor.h), 0: Dummywerte zum Testen ohne Sonde.
+#ifndef PEGEL_SENSOR
+  #define PEGEL_SENSOR  1
+#endif
 
 #ifndef PEGEL_INTERVAL_S
   #define PEGEL_INTERVAL_S  60
@@ -79,17 +85,26 @@ class SenderMesh : public mesh::Mesh {
   uint32_t next_status = 0;
   bool awaiting_reply = false;
 
-  uint16_t measureLevel() {
-    // Dummywert: 1,50 m mit 6-Stunden-Welle ±30 cm und etwas Rauschen.
+  bool measureLevel(uint16_t& level_mm) {
+#if PEGEL_SENSOR
+    return level_sensor_read_mm(level_mm);
+#else
+    // Dummywert ohne Sonde: 1,50 m mit 6-Stunden-Welle ±30 cm und etwas Rauschen.
     float t = millis() / 1000.0f;
     float level = 1500.0f + 300.0f * sinf(2.0f * PI * t / (6.0f * 3600.0f)) + (float)random(-5, 6);
-    return (uint16_t)constrain(level, 0.0f, 65535.0f);
+    level_mm = (uint16_t)constrain(level, 0.0f, 65535.0f);
+    return true;
+#endif
   }
 
   void sendReading() {
     uint32_t measured_at = millis();
     PegelReading r;
-    r.level_mm = measureLevel();
+    if (!measureLevel(r.level_mm)) {
+      // Ohne gültigen Wert wird nichts gesendet; auf dem Server fehlt dann dieser Messpunkt.
+      logf("sensor read failed\n");
+      return;
+    }
     r.counter = ++counter;
     if (counter % CTR_SAVE_STEP == 0) saveCounter(counter);
     r.age_s = (uint8_t)min((millis() - measured_at) / 1000UL, 255UL);
@@ -209,6 +224,9 @@ void setup() {
   }
   fast_rng.begin(radio_driver.getRngSeed());
   InternalFS.begin();
+#if PEGEL_SENSOR
+  level_sensor_begin();
+#endif
   the_mesh.begin();
 }
 
