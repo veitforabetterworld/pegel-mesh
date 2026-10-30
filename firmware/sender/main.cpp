@@ -100,8 +100,7 @@ class SenderMesh : public mesh::Mesh {
       return battery_low;
     }
     logf("battery %u mV %d mA\n", bat_mv, bat_ma);
-    if (bat_mv < PEGEL_BATTERY_LOW_MV) battery_low = true;
-    else if (bat_mv >= PEGEL_BATTERY_OK_MV) battery_low = false;
+    battery_low = battery_low_update(battery_low, bat_mv);
     return battery_low;
   }
 #endif

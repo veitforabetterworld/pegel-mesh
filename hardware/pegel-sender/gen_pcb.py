@@ -26,9 +26,9 @@ ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
 # Netzklassen: (Name, Bahnbreite, Via-Durchmesser, Netze). Die Breite muss an die engsten Pins des Netzes passen
 # (VSYS und +3V3 liegen an 0,5-mm-Pins, bleiben schmal); die 3 A tragen dort Kupferflächen (route.py), GND ist Fläche.
 NETCLASSES = [
-    ("Power3A", 1.2, 0.8, {"SOLAR_RAW", "SOLAR_F", "DC_RAW", "DC_F", "CHG_SW", "BAT_P", "HEAT_N"}),
-    ("Power1A", 0.6, 0.8, {"VSOL", "CHG_CSP"}),
-    ("Power", 0.4, 0.6, {"BAT_N", "PROT_D", "V12_RAW", "V12_PROBE", "BST_SW"}),
+    ("Power3A", 1.2, 1.2, {"SOLAR_RAW", "SOLAR_F", "DC_RAW", "DC_F", "CHG_SW", "BAT_P", "HEAT_N"}),
+    ("Power1A", 0.6, 0.8, {"VSOL", "CHG_CSP", "BST_SW"}),
+    ("Power", 0.4, 0.6, {"BAT_N", "PROT_D", "V12_RAW", "V12_PROBE", "HEAT_PU"}),
 ]
 
 # Feste Lage aller Bauteile: fixed_positions.py (dump_fixed.py aus gerouteter Platine).
@@ -341,7 +341,8 @@ def setup_board(board):
         nc.SetTrackWidth(mm(width))
         nc.SetClearance(mm(0.2))
         nc.SetViaDiameter(mm(via))
-        nc.SetViaDrill(mm(0.4 if via > 0.6 else 0.3))
+        # Via-Hülse 20 µm: 0,6 mm Bohrung trägt wie ~1,1 mm Bahn (3 A), 0,4 mm wie ~0,7 mm
+        nc.SetViaDrill(mm(0.6 if via >= 1.2 else 0.4 if via > 0.6 else 0.3))
         ns.SetNetclass(name, nc)
         for net in members:
             ns.SetNetclassPatternAssignment(net, name)

@@ -13,6 +13,13 @@
 #define PEGEL_BATTERY_OK_MV   3000
 #endif
 
+// Neuer Zustand "fast leer" nach einer Messung: unter LOW wird er gesetzt, erst ab OK wieder gelöscht.
+inline bool battery_low_update(bool low, uint16_t millivolt) {
+  if (millivolt < PEGEL_BATTERY_LOW_MV) return true;
+  if (millivolt >= PEGEL_BATTERY_OK_MV) return false;
+  return low;
+}
+
 bool battery_begin();
 // Eine Messung (~20 ms). false, wenn der Chip nicht antwortet.
 bool battery_read(uint16_t& millivolt, int16_t& milliamp);

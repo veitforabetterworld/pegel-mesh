@@ -34,9 +34,9 @@ POWER_ZONES = [
     ("VSOL", (17, 1.5, 33, 16), 3),
     ("DC_F", (14, 26, 22, 44), 3),
     ("CHG_SW", (33, 1.5, 44.5, 20), 4),
-    ("CHG_CSP", (43.5, 13, 57, 19.6), 4),
+    ("CHG_CSP", (43.5, 8.5, 56.5, 21.0), 4),   # L1.2 (53,5/10) bis R1.1 (45/21)
     ("VSYS", (43, 19.8, 66, 32), 3),
-    ("BAT_N", (10, 46, 23, 62), 3),
+    ("BAT_N", (4.5, 46, 19.2, 62), 3),         # J2.2 bis zu den S1-Pins; S2 (GND) bleibt frei für die GND-Fläche
 ]
 
 
@@ -879,11 +879,72 @@ def silk_errors(report: dict) -> list[str]:
     return bad
 
 
+# Hochstrompfade, die Freerouting sonst mit Signalbahnen durch die Flächen zerschneidet: vorab als
+# feste Bahnen gelegt (Netz, Breite, Punkte, Via am Ende mit Bohrung)
+PREROUTE = [
+    ("CHG_CSP", 1.2, [(53.55, 10.0), (53.55, 21.0), (50.96, 21.0)], None),     # L1.2 → R1.1, 3 A
+    ("VSYS", 1.2, [(45.04, 21.0), (45.04, 29.0)], None),                         # R1.2 → R8.1, 3 A
+    ("GND", 1.0, [(38.42, 15.4), (40.3, 15.4)], 0.6),                            # D3 Anode → GND-Fläche, 3 A
+    ("GND", 1.0, [(38.42, 16.6), (40.3, 16.6)], 0.6),
+    ("GND", 0.4, [(21.86, 49.7), (21.86, 50.36)], None),                         # Q2 S2-Pins
+    ("GND", 0.4, [(21.86, 56.7), (21.86, 57.36)], None),                         # Q3 S2-Pins
+    # Q3 auf der Oberseite zu Q2 und gemeinsam über eine Via zur GND-Fläche (unten unter Q3 nur eine Insel);
+    # 0,6 mm Abstand zu den Pads lässt PROT_OC von Q2 durch
+    ("GND", 0.5, [(21.86, 57.03), (24.0, 57.03), (24.0, 50.03)], None),
+    ("GND", 0.5, [(21.86, 50.03), (24.0, 50.03)], 0.4),                          # 3 A gesamt
+]
+
+
+def preroute(board):
+    for net, width, pts, drill in PREROUTE:
+        n = board.FindNet(net)
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(pt(x1, y1))
+            t.SetEnd(pt(x2, y2))
+            t.SetWidth(mm(width))
+            t.SetLayer(pcbnew.F_Cu)
+            t.SetNet(n)
+            t.SetLocked(True)
+            board.Add(t)
+        if drill:
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pt(*pts[-1]))
+            v.SetWidth(mm(drill + 0.4))
+            v.SetDrill(mm(drill))
+            v.SetNet(n)
+            v.SetLocked(True)
+            board.Add(v)
+
+
+# Unterseite ohne Bahnen (Vias erlaubt), damit die GND-Fläche dort zusammenhängt: Rückstrom der Schutz-FETs
+KEEPOUT_B = [(22.6, 48.6, 25.0, 58.4)]
+
+
+def keepouts(board):
+    for x1, y1, x2, y2 in KEEPOUT_B:
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetLayer(pcbnew.B_Cu)
+        z.SetDoNotAllowTracks(True)
+        z.SetDoNotAllowVias(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        o = z.Outline()
+        o.NewOutline()
+        for x, y in ((x1, y1), (x2, y1), (x2, y2), (x1, y2)):
+            o.Append(pt(x, y))
+        board.Add(z)
+
+
 def route_board(board, jar, java):
     for t in list(board.GetTracks()):
         board.Remove(t)
     for z in list(board.Zones()):
         board.Remove(z)
+    preroute(board)
+    keepouts(board)
     # GND nicht vorher als Fläche: sonst lässt Freerouting die Masse-Pins offen, sobald die Fläche zerrissen ist.
     if not pcbnew.ExportSpecctraDSN(board, DSN):
         raise SystemExit("DSN export failed")

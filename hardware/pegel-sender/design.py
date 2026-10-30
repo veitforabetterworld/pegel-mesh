@@ -69,7 +69,9 @@ add("U1", "pegel:CN3795", "Package_SO:SSOP-10_3.9x4.9mm_P1.00mm", "CN3795", "Con
 c("C1", "100nF 50V", "CHG_VG", "VSOL", C0603, "CAP 100nF 50V X7R 0603", g)
 add("C2", "Device:C_Polarized", "Capacitor_SMD:CP_Elec_8x10", "100uF 35V", "Panasonic EEE-FK1V101P", {"1": "VSOL", "2": GND}, g)
 c("C3", "10uF 50V", "VSOL", GND, C1210, "CAP 10uF 50V X7R 1210", g)
-c("C4", "100nF 50V", "VSOL", GND, C0603, "CAP 100nF 50V X7R 0603", g)
+# Eingangsrippel bis 1,4 A eff (12-V-Netzteil, D ≈ 0,3): drei Keramik-C tragen ihn, der Elko (0,33 A) puffert.
+c("C4", "10uF 50V", "VSOL", GND, C1210, "CAP 10uF 50V X7R 1210", g)
+c("C22", "10uF 50V", "VSOL", GND, C1210, "CAP 10uF 50V X7R 1210", g)
 add("Q1", "Device:Q_PMOS", "Package_TO_SOT_SMD:TO-252-2", "AOD4189", "AOS AOD4189 (-40 V)",
     {"1": "CHG_DRV", "2": "CHG_SW", "3": "VSOL"}, g)
 add("D3", "Device:D_Schottky", "Diode_SMD:D_SMC", "B540C", "Diodes B540C-13-F (40 V 5 A)", {"1": "CHG_SW", "2": GND}, g)
@@ -81,19 +83,19 @@ r("R4", "300k", "VSOL", "MPPT", group=g)
 r("R5", "21.5k", "MPPT", GND, group=g)
 r("R6", "120", "CHG_COM", "CHG_COMC", group=g)
 c("C5", "220nF 16V", "CHG_COMC", GND, group=g)
-# Unter ~14 V (Netzteil) liegt 330k parallel zu R4, damit der MPPT-Pin bei 12 V über 1,205 V bleibt.
-# Q9 ist ohne Versorgung an (Teiler entspannt), sonst startet der Lader aus 12 V nicht.
-# U10 zieht nur bei hoher Panelspannung Q11 auf und schaltet Q9 ab. Hysterese etwa 13–15 V.
+# Netzteil am 12-V-Eingang: 330k parallel zu R4, MPPT-Arbeitspunkt ≈ 10 V statt 18 V.
+# U10 erkennt das Netzteil direkt an DC_F, nicht an VSOL: an VSOL zöge der Lader die Panelspannung bei
+# wenig Licht selbst unter die Schwelle und rastete auf 10 V ein (Panel weit unter dem MPP).
+# Ohne Versorgung (VSYS = 0) ist Q9 an, damit der Lader auch aus dem Netzteil anläuft.
 g = "mppt"
-r("R40", "470k", "VSOL", "VSOL_DIV", group=g)
-r("R41", "68.1k", "VSOL_DIV", GND, group=g)
-# Referenz aus +3V3: an VSYS hinge die Schwelle an der Akkuspannung (2,8 V: 11,2 V), ein 12-V-Netzteil
-# gälte bei leerem Akku als Panel und könnte nicht laden. 3,3 V · 1M/1,976M = 1,67 V → 13,2 V an VSOL.
+r("R40", "33k", "DC_F", "DC_DIV", group=g)
+r("R41", "10k", "DC_DIV", GND, group=g)   # zieht DC_F ohne Netzteil herunter (Sperrstrom von D9)
 r("R42", "976k", "+3V3", "MPPT_REF", group=g)
 r("R43", "1M", "MPPT_REF", GND, group=g)
+# Ausgang hoch (kein Netzteil) → Q11 an → Q9 aus. Schwelle mit R44: ein ab ~9,5 V, aus unter ~4,8 V.
 add("U10", "Comparator:TLV3401", "Package_TO_SOT_SMD:SOT-23-5", "TLV3401", "TI TLV3401IDBVR",
-    {"1": "MPPT_EN", "2": GND, "3": "VSOL_DIV", "4": "MPPT_REF", "5": "VSYS"}, g)
-r("R44", "1M", "MPPT_EN", "VSOL_DIV", group=g)
+    {"1": "MPPT_EN", "2": GND, "3": "MPPT_REF", "4": "DC_DIV", "5": "VSYS"}, g)
+r("R44", "1M", "MPPT_EN", "MPPT_REF", group=g)
 r("R45", "1M", "MPPT_EN", "VSYS", group=g)
 c("C21", "100nF 16V", "VSYS", GND, group=g)
 add("Q11", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002",
@@ -152,17 +154,19 @@ add("U9", "Power_Protection:LM66100", "Package_TO_SOT_SMD:SOT-363_SC-70-6", "LM6
     {"1": "+3V3", "2": GND, "3": "XIAO_3V3", "4": "", "5": GND, "6": "XIAO_3V3"}, g)
 c("C20", "1uF 10V", "XIAO_3V3", GND, C0603, "CAP 1uF 10V X5R 0603", g)
 
-# ---------------------------------------------------------------- 12 V für die Sonde: TPS61040 + Lastschalter
+# ---------------------------------------------------------------- 12 V für die Sonde: LM2735 + Lastschalter
+# Sonde: 30–80 mA beim Messen, Spitze bis 200 mA. LM2735 (2,1-A-Schalter, 1,6 MHz) schafft aus 2,8 V
+# rund 270 mA bei 12,3 V; der TPS61040 (400 mA Spitze) kam nur auf ~35 mA. Pinbelegung wie TPS61040.
 g = "12v"
-add("U5", "Regulator_Switching:TPS61040DBV", "Package_TO_SOT_SMD:SOT-23-5", "TPS61040", "TI TPS61040DBVR",
+add("U5", "Regulator_Switching:LM2735XMF", "Package_TO_SOT_SMD:SOT-23-5", "LM2735", "TI LM2735XMFE/NOPB",
     {"1": "BST_SW", "2": GND, "3": "BST_FB", "4": "SENS_EN", "5": "VSYS"}, g)
-add("L3", "Device:L", "Inductor_SMD:L_Taiyo-Yuden_NR-30xx", "10uH", "Taiyo Yuden NR3015T100M", {"1": "VSYS", "2": "BST_SW"}, g)
+add("L3", "Device:L", "Inductor_SMD:L_Bourns_SRN6045TA", "4.7uH", "Bourns SRN6045TA-4R7Y", {"1": "VSYS", "2": "BST_SW"}, g)
 add("D5", "Device:D_Schottky", "Diode_SMD:D_SOD-123", "MBR0540", "onsemi MBR0540T1G (40 V)", {"1": "V12_RAW", "2": "BST_SW"}, g)
 r("R12", "820k", "V12_RAW", "BST_FB", group=g)
-r("R13", "91k", "BST_FB", GND, group=g)
+r("R13", "93.1k", "BST_FB", GND, group=g)   # 1,255 V · (1 + 820k/93,1k) = 12,31 V
 c("C12", "22pF 50V", "V12_RAW", "BST_FB", group=g)
-c("C13", "4.7uF 25V", "V12_RAW", GND, C1206, "CAP 4.7uF 25V X7R 1206", g)
-c("C14", "4.7uF 10V", "VSYS", GND, C0805, "CAP 4.7uF 10V X5R 0805", g)
+c("C13", "10uF 25V", "V12_RAW", GND, C1206, "CAP 10uF 25V X5R 1206", g)
+c("C14", "22uF 10V", "VSYS", GND, C0805, "CAP 22uF 10V X5R 0805", g)
 r("R14", "100k", "SENS_EN", GND, group=g)
 add("Q4", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "AO3401A", "AOS AO3401A",
     {"1": "PSW_G", "2": "V12_RAW", "3": "V12_PROBE"}, g)
@@ -207,11 +211,13 @@ add("TH1", "Device:Thermistor_NTC", "Resistor_SMD:R_0603_1608Metric", "100k B425
     {"1": "T_NTC", "2": "NTC_SEL1"}, g)
 add("JP2", "Jumper:SolderJumper_3_Bridged12", "Jumper:SolderJumper-3_P1.3mm_Bridged12_RoundedPad1.0x1.5mm", "NTC intern/extern", "",
     {"1": "NTC_SEL1", "2": GND, "3": "NTC_SEL3"}, g)
-add("J4", "Connector:Conn_01x02_Pin", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", "NTC extern", "",
+add("J4", "Connector:Conn_01x02_Pin", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", "NTC", "",
     {"1": "T_NTC", "2": "NTC_SEL3"}, g, dnp=True)
-r("R21", "470k", "VSYS", "T_REF0", group=g)   # B4250: Ladestopp ~0 °C, Heizung ~+2 °C
-r("R22", "28.7k", "T_REF0", "T_REF2", group=g)
-r("R23", "499k", "T_REF2", GND, group=g)
+# B4250, simuliert (verify/sweeps.py) inkl. Belastung durch R24/R26: beim Abkühlen Heizung ein ~+3,5 °C,
+# Ladesperre ~+1 °C (Abstand zu 0 °C für ±1 K Toleranz); beim Erwärmen jeweils ~2 K später.
+r("R21", "499k", "VSYS", "T_REF0", group=g)
+r("R22", "53.6k", "T_REF0", "T_REF2", group=g)
+r("R23", "453k", "T_REF2", GND, group=g)
 # Kanal A: bei Kälte Ausgang hoch, Q10 zieht den MPPT-Pin auf GND, der CN3795 lädt nicht mehr.
 # Nicht über den Lade-FET des Akkuschutzes: dessen Body-Diode läge dann im Entladepfad, ~0,6 V über
 # den FETs löst beim HY2112 den Entlade-Überstrom (100–200 mV) aus und trennt den Akku.
@@ -225,7 +231,10 @@ r("R24", "4.7M", "CHG_INHIBIT", "T_NTC", group=g)   # Mitkopplung: bei Kälte he
 r("R25", "1M", "HEAT_OFF", "VSYS", group=g)
 r("R26", "10M", "HEAT_OFF", "T_REF2", group=g)
 add("Q6", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002", {"1": "HEAT_OFF", "2": GND, "3": "HEAT_G"}, g)
-r("R27", "100k", "VSOL", "HEAT_G", group=g)
+# Z-Diode in Reihe: nachts speist der Akku über L1 und die Body-Diode von Q1 ~3 V auf VSOL zurück.
+# Ohne sie bekäme Q7 dann Gate-Spannung und die Heizung zöge ~40 mA aus dem Akku. Ein ab VSOL ≈ 8 V.
+add("D14", "Device:D_Zener", "Diode_SMD:D_SOD-123", "5V6", "BZT52C5V6", {"1": "VSOL", "2": "HEAT_PU"}, g)
+r("R27", "100k", "HEAT_PU", "HEAT_G", group=g)
 add("D7", "Device:D_Zener", "Diode_SMD:D_SOD-123", "12V", "BZT52C12", {"1": "HEAT_G", "2": GND}, g)
 add("Q7", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "SI2318CDS", "Vishay SI2318CDS (40 V)",
     {"1": "HEAT_G", "2": GND, "3": "HEAT_N"}, g)
