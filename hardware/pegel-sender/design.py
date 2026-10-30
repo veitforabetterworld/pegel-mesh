@@ -82,9 +82,12 @@ r("R7", "4.7k", "CHG_LEDA", "VSOL", R0805, "RES 4.7k 1% 0805", g)
 g = "battery"
 r("R8", "10m", "VSYS", "BAT_P", R2512, "RES 10mOhm 1% 2W 2512", g)
 add("U2", "Sensor_Energy:INA226", "Package_SO:TSSOP-10_3x3mm_P0.5mm", "INA226", "TI INA226AIDGSR",
-    {"1": GND, "2": GND, "3": "", "4": "I2C_SDA", "5": "I2C_SCL", "6": "+3V3", "7": GND, "8": "BAT_P",
-     "9": "BAT_P", "10": "VSYS"}, g)
+    {"1": GND, "2": GND, "3": "", "4": "I2C_SDA", "5": "I2C_SCL", "6": "+3V3", "7": GND, "8": "INA_M",
+     "9": "INA_M", "10": "INA_P"}, g)
 c("C8", "100nF", "+3V3", GND, group=g)
+# Kelvin-Messleitungen vom Shunt; 10 Ω begrenzen den Strom bei Fehlern (Verstärkungsfehler < 0,1 %).
+r("R37", "10", "VSYS", "INA_P", group=g)
+r("R38", "10", "BAT_P", "INA_M", group=g)
 add("J2", "Connector:Screw_Terminal_01x02", "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",
     "AKKU 3,2V", "Phoenix MKDS 1,5/2-5,08 (1715721)", {"1": "BAT_P", "2": "BAT_N"}, g)
 add("U3", "pegel:HY2112", "Package_TO_SOT_SMD:SOT-23-6", "HY2112-CB", "HYCON HY2112-CB",

@@ -21,9 +21,13 @@ FP_ROOT = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "share"
 W, H = 100.0, 70.0          # Platinengröße in mm (IP65-Gehäuse ca. 115 × 90 mm)
 ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
 
-# Netzklassen: Breite, Abstand
-POWER_3A = {"SOLAR_RAW", "SOLAR_F", "VSOL", "CHG_SW", "CHG_CSP", "VSYS", "BAT_P", "BAT_N", "PROT_D", "GND", "HEAT_N"}
-POWER_LOW = {"+3V3", "V12_RAW", "V12_PROBE", "BB_LX1", "BB_LX2", "BST_SW"}
+# Netzklassen: (Name, Bahnbreite, Via-Durchmesser, Netze). Die Breite muss an die engsten Pins des Netzes passen
+# (VSYS und +3V3 liegen an 0,5-mm-Pins, bleiben schmal); die 3 A tragen dort Kupferflächen (route.py), GND ist Fläche.
+NETCLASSES = [
+    ("Power3A", 1.2, 0.8, {"SOLAR_RAW", "SOLAR_F", "CHG_SW", "BAT_P", "HEAT_N"}),
+    ("Power1A", 0.6, 0.8, {"VSOL", "CHG_CSP"}),
+    ("Power", 0.4, 0.6, {"BAT_N", "PROT_D", "V12_RAW", "V12_PROBE", "BST_SW"}),
+]
 
 # Feste Lage wichtiger Bauteile: Ref -> (x, y, Drehung in Grad), Mitte des Bauteils in Platinenkoordinaten.
 # Klemmen: +y des Footprints ist die Kabeleinführung, -90° zeigt sie nach links, 90° nach rechts.
@@ -100,7 +104,7 @@ def setup_board(board):
     ds = board.GetDesignSettings()
     ds.SetCopperLayerCount(2)
     ds.SetAuxOrigin(pos(0, H))   # Nullpunkt für Bohr- und Bestückungsdaten: Ecke unten links
-    ds.m_TrackMinWidth = mm(0.2)
+    ds.m_TrackMinWidth = mm(0.15)
     ds.m_MinClearance = mm(0.2)
     ds.m_ViasMinSize = mm(0.6)
     ds.m_MinThroughDrill = mm(0.2)
@@ -110,17 +114,15 @@ def setup_board(board):
     default.SetClearance(mm(0.2))
     default.SetViaDiameter(mm(0.6))
     default.SetViaDrill(mm(0.3))
-    for name, width, via in (("Power3A", 0.8, 0.8), ("Power", 0.5, 0.6)):
+    for name, width, via, members in NETCLASSES:
         nc = pcbnew.NETCLASS(name)
         nc.SetTrackWidth(mm(width))
         nc.SetClearance(mm(0.2))
         nc.SetViaDiameter(mm(via))
         nc.SetViaDrill(mm(0.4 if via > 0.6 else 0.3))
         ns.SetNetclass(name, nc)
-    for net in POWER_3A:
-        ns.SetNetclassPatternAssignment(net, "Power3A")
-    for net in POWER_LOW:
-        ns.SetNetclassPatternAssignment(net, "Power")
+        for net in members:
+            ns.SetNetclassPatternAssignment(net, name)
 
 
 def outline(board):
