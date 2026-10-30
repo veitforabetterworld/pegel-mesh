@@ -29,6 +29,7 @@
 #define LEVEL_NO_RESPONSE     1   // keine oder fehlerhafte Antwort (Zeitüberschreitung, CRC)
 #define LEVEL_OUT_OF_RANGE    2   // Wert außerhalb des Messbereichs
 #define LEVEL_NO_INTERFACE    3   // RS485-Wandler (SC16IS740) antwortet nicht
+#define LEVEL_BATTERY_LOW     4   // Akku fast leer (Sender, Trägerplatine; Schwelle in battery.h)
 
 void level_sensor_begin();
 // Versorgung der Sonde; ohne Trägerplatine wirkungslos. level_sensor_read_mm schaltet danach selbst ab.

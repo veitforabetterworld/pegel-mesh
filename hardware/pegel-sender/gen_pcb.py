@@ -1,7 +1,7 @@
 """Erzeugt pegel-sender.kicad_pcb aus design.py: Umriss, Footprints mit Netzen, Netzklassen, Platzierung.
 
-Aufruf mit dem Python von KiCad:
-  "%LOCALAPPDATA%\\Programs\\KiCad\\10.0\\bin\\python.exe" gen_pcb.py
+Aufruf mit Python, das pcbnew lädt (KiCad-Paket oder build/kicad-appimage/squashfs-root):
+  python3 gen_pcb.py
 Danach routen (route.py) – das Routing wird nicht hier erzeugt.
 """
 
@@ -13,10 +13,12 @@ import pcbnew
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import design  # noqa: E402
+import kicad_env  # noqa: E402
+from fixed_positions import FIXED  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "pegel-sender.kicad_pcb")
-FP_ROOT = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "share", "kicad", "footprints")
+FP_ROOT = kicad_env.footprint_root()
 
 W, H = 100.0, 70.0          # Platinengröße in mm (IP65-Gehäuse ca. 115 × 90 mm)
 ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
@@ -24,47 +26,33 @@ ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
 # Netzklassen: (Name, Bahnbreite, Via-Durchmesser, Netze). Die Breite muss an die engsten Pins des Netzes passen
 # (VSYS und +3V3 liegen an 0,5-mm-Pins, bleiben schmal); die 3 A tragen dort Kupferflächen (route.py), GND ist Fläche.
 NETCLASSES = [
-    ("Power3A", 1.2, 0.8, {"SOLAR_RAW", "SOLAR_F", "CHG_SW", "BAT_P", "HEAT_N"}),
+    ("Power3A", 1.2, 0.8, {"SOLAR_RAW", "SOLAR_F", "DC_RAW", "DC_F", "CHG_SW", "BAT_P", "HEAT_N"}),
     ("Power1A", 0.6, 0.8, {"VSOL", "CHG_CSP"}),
     ("Power", 0.4, 0.6, {"BAT_N", "PROT_D", "V12_RAW", "V12_PROBE", "BST_SW"}),
 ]
 
-# Feste Lage wichtiger Bauteile: Ref -> (x, y, Drehung in Grad), Mitte des Bauteils in Platinenkoordinaten.
-# Klemmen: +y des Footprints ist die Kabeleinführung, -90° zeigt sie nach links, 90° nach rechts.
-FIXED = {
-    "H1": (4, 4, 0), "H2": (96, 4, 0), "H3": (4, 66, 0), "H4": (96, 66, 0),
-    "J1": (6.5, 15, -90),
-    "J2": (6.5, 53, -90),
-    "J3": (93.5, 50, 90),
-    # XIAO: USB-Buchse zeigt nach rechts zur Platinenkante, D0 bzw. 5V an Pin 1 (x = 94).
-    "J5": (86.38, 10, -90),
-    "J6": (86.38, 25.24, -90),
-    # Lader
-    "F1": (15.5, 4.5, 0), "D2": (17, 11, 90), "D1": (17, 20, 90),
-    "C2": (24, 7, 0), "C3": (24, 14, 0), "C4": (28, 14, 90),
-    "Q1": (35, 7, 0),
-    "L1": (48, 10, 0),
-    "D3": (35, 16, 0),
-    "R1": (48, 21, 0),
-    "U1": (28, 23, 0),
-    "C6": (60, 20, 0),
-    # Akku
-    "R8": (48, 29, 0),
-    "U2": (40, 33, 0),
-    "Q2": (19, 50, 0), "Q3": (19, 57, 0), "U3": (27, 52, 0),
-    # Versorgungen
-    "U4": (72, 33, 0), "L2": (72, 38, 0),
-    "U5": (75, 45, 0), "L3": (69, 45, 0), "Q4": (80, 42, 0),
-    # RS485
-    "U6": (69, 55, 0), "Y1": (62, 55, 0), "U7": (78, 58, 0), "D6": (80, 63.5, 0), "JP1": (85, 61, 0),
-    # Frost/Heizung
-    "U8": (38, 46, 0), "TH1": (28, 41, 0), "Q6": (47, 50, 0), "Q7": (56, 63, 0),
-    "R28": (22, 63, 90), "R29": (26, 63, 90), "R30": (30, 63, 90),
-    "R31": (34, 63, 90), "R32": (38, 63, 90), "R33": (42, 63, 90),
-}
+# Feste Lage aller Bauteile: fixed_positions.py (dump_fixed.py aus gerouteter Platine).
 
 KEEPOUT_XIAO = (70.0, 7.0, 99.0, 31.5)   # unter dem XIAO-Stapel und seiner Beschriftung nichts automatisch platzieren
 MARGIN = 0.4
+
+# KiCad L_Bourns_SRP2313AA.step native ~23.5×22×12.6 mm → SRP1245A 13.5×12.5×4.8 mm
+PROJECT_MODELS = {
+    "L1": ("3dmodels/L_Bourns_SRP1245A.step", (0.574, 0.568, 0.381)),
+}
+
+
+def apply_project_models(fps):
+    for ref, (relpath, scale) in PROJECT_MODELS.items():
+        fp = fps[ref]
+        fp.Models().clear()
+        md = pcbnew.FP_3DMODEL()
+        md.m_Filename = "${KIPRJMOD}/" + relpath
+        md.m_Scale = pcbnew.VECTOR3D(scale[0], scale[1], scale[2])
+        md.m_Offset = pcbnew.VECTOR3D(0, 0, 0)
+        md.m_Rotation = pcbnew.VECTOR3D(0, 0, 0)
+        md.m_Show = True
+        fp.Models().append(md)
 
 
 def mm(v):
@@ -84,6 +72,12 @@ def bbox_mm(fp):
             pcbnew.ToMM(bb.GetRight()) - ORIGIN[0], pcbnew.ToMM(bb.GetBottom()) - ORIGIN[1])
 
 
+def place_at(fp, x, y, rot):
+    """Footprint-Anker (KiCad Position) setzen — exakt wie in .kicad_pcb."""
+    fp.SetOrientationDegrees(rot)
+    fp.SetPosition(pos(x, y))
+
+
 def center_at(fp, x, y, rot):
     fp.SetOrientationDegrees(rot)
     fp.SetPosition(pos(0, 0))
@@ -100,12 +94,240 @@ def inside(a):
     return a[0] >= 1.0 and a[1] >= 1.0 and a[2] <= W - 1.0 and a[3] <= H - 1.0
 
 
+def item_box(item):
+    bb = item.GetBoundingBox()
+    return (pcbnew.ToMM(bb.GetLeft()) - ORIGIN[0], pcbnew.ToMM(bb.GetTop()) - ORIGIN[1],
+            pcbnew.ToMM(bb.GetRight()) - ORIGIN[0], pcbnew.ToMM(bb.GetBottom()) - ORIGIN[1])
+
+
+def boxes_hit(a, b, gap=0.0):
+    return not (a[2] + gap <= b[0] or b[2] + gap <= a[0] or a[3] + gap <= b[1] or b[3] + gap <= a[1])
+
+
+def silk_obstacles(board):
+    """Pads und Bohrungen, auf denen kein Siebdruck liegen darf."""
+    pads, holes = [], []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            pads.append(item_box(pad))
+            drill = pad.GetDrillSize()
+            if drill.x > 0:
+                p = pad.GetPosition()
+                holes.append((pcbnew.ToMM(p.x) - ORIGIN[0], pcbnew.ToMM(p.y) - ORIGIN[1],
+                              pcbnew.ToMM(max(drill.x, drill.y)) / 2))
+    return pads, holes
+
+
+def component_bodies(board):
+    """Fab-Umriss der Bauteile plus die Fläche unter dem XIAO. Siebdruck darf darauf nicht liegen."""
+    bodies = [KEEPOUT_XIAO]
+    for fp in board.GetFootprints():
+        fab = [item_box(gi) for gi in fp.GraphicalItems()
+               if gi.GetLayer() == pcbnew.F_Fab and gi.GetClass() == "PCB_SHAPE"]
+        silk = [item_box(gi) for gi in fp.GraphicalItems()
+                if gi.GetLayer() == pcbnew.F_SilkS and gi.GetClass() == "PCB_SHAPE"]
+        shapes = fab or silk
+        if shapes:
+            box = (min(b[0] for b in shapes) - 0.25, min(b[1] for b in shapes) - 0.25,
+                   max(b[2] for b in shapes) + 0.25, max(b[3] for b in shapes) + 0.25)
+        else:
+            pads = [item_box(p) for p in fp.Pads()]
+            if not pads:
+                continue
+            box = (min(b[0] for b in pads) - 0.55, min(b[1] for b in pads) - 0.55,
+                   max(b[2] for b in pads) + 0.55, max(b[3] for b in pads) + 0.55)
+        bodies.append(box)
+    return bodies
+
+
+def _set_text_angle(text, degrees):
+    text.SetTextAngle(pcbnew.EDA_ANGLE(degrees, pcbnew.DEGREES_T))
+
+
+def silk_reserve(bb):
+    """Platz für Ref-Designator oberhalb des Footprints bei Auto-Platzierung."""
+    l, t, r, b = bb
+    return (l - 0.35, t - 2.0, r + 0.35, b + 0.35)
+
+
+def field_ok(box, pads, holes, taken, bodies):
+    if box[0] < 0.5 or box[1] < 0.5 or box[2] > W - 0.5 or box[3] > H - 0.5:
+        return False
+    if any(boxes_hit(box, p, 0.28) for p in pads):
+        return False
+    if any(boxes_hit(box, t, 0.15) for t in taken):
+        return False
+    if any(boxes_hit(box, b, 0.12) for b in bodies):
+        return False
+    for hx, hy, hr in holes:
+        if boxes_hit(box, (hx - hr, hy - hr, hx + hr, hy + hr), 0.2):
+            return False
+    return True
+
+
+def place_field_text(text, starts, pads, holes, taken, bodies):
+    """Text knapp neben Startpunkt oder Footprint — kein Spiral-Wandern über die Platine."""
+    if not isinstance(starts, list):
+        starts = [starts]
+    for x0, y0 in starts:
+        for dx, dy in ((0, 0), (0.55, 0), (-0.55, 0), (0, 0.55), (0, -0.55), (1.1, 0), (0, 1.1)):
+            _set_text_angle(text, 0)
+            text.SetPosition(pos(x0 + dx, y0 + dy))
+            box = item_box(text)
+            if field_ok(box, pads, holes, taken, bodies):
+                taken.append(box)
+                return True
+    x0, y0 = starts[0]
+    _set_text_angle(text, 0)
+    text.SetPosition(pos(x0, y0))
+    taken.append(item_box(text))
+    return False
+
+
+def ref_label_starts(fp):
+    l, t, r, b = bbox_mm(fp)
+    cx, cy = (l + r) / 2, (t + b) / 2
+    return [
+        (cx, t - 1.05),
+        (cx, b + 1.05),
+        (l - 1.05, cy),
+        (r + 1.05, cy),
+    ]
+
+
+def shove_text(text, start, pads, holes, taken, bodies=(), max_radius=13.0):
+    """Schiebt Text von Pads, Löchern, Körpern, anderem Text und dem Rand. Kein Fallback auf ein Bauteil."""
+    def ok(box):
+        return field_ok(box, pads, holes, taken, bodies)
+
+    x0, y0 = start
+    height = pcbnew.ToMM(text.GetTextHeight())
+    radii = [i * 0.55 for i in range(0, 24) if i * 0.55 <= max_radius + 0.01]
+    if not radii:
+        radii = [0.0]
+    for scale in (1.0, 0.6 / height if height > 0.6 else 1.0):
+        h = max(0.6, height * scale)
+        text.SetTextSize(pcbnew.VECTOR2I(mm(h), mm(h)))
+        text.SetTextThickness(mm(max(0.08, h * 0.12)))
+        for angle in (0, 90):
+            _set_text_angle(text, angle)
+            for radius in radii:
+                steps = 1 if radius == 0 else max(8, int(radius * 6))
+                for k in range(steps):
+                    a = 2 * math.pi * k / steps
+                    text.SetPosition(pos(x0 + radius * math.cos(a), y0 + radius * math.sin(a)))
+                    box = item_box(text)
+                    if ok(box):
+                        taken.append(box)
+                        return True
+    _set_text_angle(text, 0)
+    text.SetPosition(pos(x0, y0))
+    try:
+        shown = text.GetShownText(True)
+    except TypeError:
+        shown = text.GetText()
+    print("silk has no free spot:", shown)
+    return False
+
+
+# (Text, x, y, Höhe mm, Ausrichtung wie label(): 0 Mitte, -1 links, 1 rechts)
+BOARD_LABELS = [
+    ("SOLAR max 25V", 14.5, 15.0, 0.85, -1),
+    ("12V min 1,5A", 14.5, 34.0, 0.8, -1),
+    ("AKKU LiFePO4 3,2V", 14.5, 53.0, 0.75, -1),
+    ("SONDE 12V RS485", 84.5, 50.0, 0.7, 1),
+    ("XIAO + Wio-SX1262", 74.0, 3.4, 0.75, 0),
+    ("USB ->", 88.0, 5.2, 0.7, 0),
+    ("pegel-sender v1", 20.0, 68.4, 0.8, 0),
+    ("(c) Veit Götz", 52.0, 68.4, 0.8, 0),
+]
+
+
+def layout_silk(board):
+    labels = {text for text, *_ in BOARD_LABELS}
+    for drawing in list(board.GetDrawings()):
+        if drawing.GetClass() != "PCB_TEXT":
+            continue
+        if drawing.GetText() in labels or drawing.GetText() in PIN_TEXTS:
+            drawing.thisown = 0
+            board.Delete(drawing)
+    for fp in board.GetFootprints():
+        ref = fp.Reference()
+        ref.SetLayer(pcbnew.F_SilkS)
+        ref.SetTextSize(pcbnew.VECTOR2I(mm(0.7), mm(0.7)))
+        ref.SetTextThickness(mm(0.1))
+        if fp.GetReference() in {"H1", "H2", "H3", "H4"}:
+            ref.SetVisible(False)
+        if fp.GetReference() in SHOW_VALUE:
+            val = fp.Value()
+            val.SetLayer(pcbnew.F_SilkS)
+            val.SetVisible(True)
+            val.SetTextSize(pcbnew.VECTOR2I(mm(0.6), mm(0.6)))
+            val.SetTextThickness(mm(0.1))
+        else:
+            fp.Value().SetVisible(False)
+
+    pads, holes = silk_obstacles(board)
+    for fp in board.GetFootprints():
+        for gi in fp.GraphicalItems():
+            if gi.GetLayer() == pcbnew.F_SilkS and gi.GetClass() == "PCB_SHAPE":
+                pads.append(item_box(gi))
+    bodies = component_bodies(board)
+    taken = []
+    for text, x, y, size, align in BOARD_LABELS:
+        t = label(board, text, x, y, size, align)
+        if not place_field_text(t, (x, y), pads, holes, taken, bodies):
+            shove_text(t, (x, y), pads, holes, taken, bodies, max_radius=3.5)
+    for fp in board.GetFootprints():
+        if not fp.Reference().IsVisible():
+            continue
+        ref = fp.Reference()
+        spec = REF_FIELDS.get(fp.GetReference())
+        if spec:
+            x, y, size, align = spec
+            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+            ref.SetTextThickness(mm(max(0.08, size * 0.12)))
+            if align:
+                ref.SetHorizJustify(
+                    pcbnew.GR_TEXT_H_ALIGN_LEFT if align < 0 else pcbnew.GR_TEXT_H_ALIGN_RIGHT
+                )
+            if not place_field_text(ref, (x, y), pads, holes, taken, bodies):
+                shove_text(ref, (x, y), pads, holes, taken, bodies, max_radius=8.0)
+        else:
+            starts = ref_label_starts(fp)
+            if not place_field_text(ref, starts, pads, holes, taken, bodies):
+                shove_text(ref, starts[0], pads, holes, taken, bodies, max_radius=7.0)
+        if fp.GetReference() in SHOW_VALUE and fp.Value().IsVisible():
+            val = fp.Value()
+            spec = VALUE_FIELDS.get(fp.GetReference())
+            if spec:
+                x, y, size, align = spec
+                val.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+                val.SetTextThickness(mm(max(0.08, size * 0.12)))
+                if align:
+                    val.SetHorizJustify(
+                        pcbnew.GR_TEXT_H_ALIGN_LEFT if align < 0 else pcbnew.GR_TEXT_H_ALIGN_RIGHT
+                    )
+                if not place_field_text(val, (x, y), pads, holes, taken, bodies):
+                    shove_text(val, (x, y), pads, holes, taken, bodies, max_radius=8.0)
+            else:
+                l, t, r, b = bbox_mm(fp)
+                cx = (l + r) / 2
+                if not place_field_text(val, [(cx, b + 1.05)], pads, holes, taken, bodies):
+                    shove_text(val, (cx, b + 1.05), pads, holes, taken, bodies, max_radius=5.0)
+    fps = {fp.GetReference(): fp for fp in board.GetFootprints()}
+    pin_labels(board, fps, pads, holes, taken, bodies)
+
+
 def setup_board(board):
     ds = board.GetDesignSettings()
     ds.SetCopperLayerCount(2)
     ds.SetAuxOrigin(pos(0, H))   # Nullpunkt für Bohr- und Bestückungsdaten: Ecke unten links
     ds.m_TrackMinWidth = mm(0.15)
     ds.m_MinClearance = mm(0.2)
+    ds.m_MinSilkTextHeight = mm(0.6)
+    ds.m_MinSilkTextThickness = mm(0.08)
+    ds.m_SilkClearance = mm(0.1)
     ds.m_ViasMinSize = mm(0.6)
     ds.m_MinThroughDrill = mm(0.2)
     ns = ds.m_NetSettings
@@ -148,36 +370,54 @@ def label(board, text, x, y, size=1.2, align=0):
     if align:
         t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_LEFT if align < 0 else pcbnew.GR_TEXT_H_ALIGN_RIGHT)
     board.Add(t)
-    w = len(text) * size * 0.8
-    x1 = x - w / 2 if align == 0 else (x if align < 0 else x - w)
-    return (x1 - 0.3, y - size * 0.7 - 0.8, x1 + w + 0.3, y + size * 0.7 + 0.8)   # mit Luft zu Bauteilen
+    return t
 
 
 # Beschriftung der Klemmen: Ref -> Text je Pin, steht neben dem Pin auf der Platinenseite der Klemme.
 PIN_LABELS = {
     "J1": {"1": "+", "2": "-"},
+    "J7": {"1": "+", "2": "-"},
     "J2": {"1": "+", "2": "-"},
     "J3": {"1": "V+ rot", "2": "V- schwarz", "3": "A weiss", "4": "B blau"},
 }
+PIN_TEXTS = {v for m in PIN_LABELS.values() for v in m.values()}
 # Bauteile, deren Wert auf dem Bestückungsdruck steht (Lötbrücken, optionaler Stecker).
 SHOW_VALUE = {"JP1", "JP2", "J4"}
+# (x, y, Höhe mm, align) — Werte weg von Nachbar-Silk (DRC)
+VALUE_FIELDS = {
+    "J4": (31.5, 41.0, 0.55, -1),
+    "JP2": (33.0, 51.5, 0.55, -1),
+}
+# Ref-Designator abseits dichtem Nachbar-Silk
+REF_FIELDS = {
+    "R16": (71.2, 52.4, 0.55, 0),
+    "J6": (82.8, 26.2, 0.55, 0),
+}
 
 
-def pin_labels(board, fps):
+def pin_labels(board, fps, pads=None, holes=None, taken=None, bodies=None):
+    """Klemmen-Pin-Texte. Ohne pads/taken: nur Reservierung für Platzierung (boxes)."""
     boxes = []
     for ref, texts in PIN_LABELS.items():
         fp = fps[ref]
         l, _, r, _ = bbox_mm(fp)
-        right_side = (l + r) / 2 < W / 2   # linke Klemmen: Text rechts daneben, rechte Klemmen: links daneben
+        right_side = (l + r) / 2 < W / 2
         for pad in fp.Pads():
             text = texts.get(pad.GetNumber())
             if not text:
                 continue
             y = pcbnew.ToMM(pad.GetPosition().y) - ORIGIN[1]
-            if right_side:
-                boxes.append(label(board, text, r + 0.6, y, 1.2, -1))
+            if ref == "J3":
+                anchor = l - 2.4
             else:
-                boxes.append(label(board, text, l - 0.6, y, 0.9, 1))
+                anchor = r + 1.2 if right_side else l - 1.2
+            align = -1 if right_side else 1
+            t = label(board, text, anchor, y, 0.75, align)
+            if pads is not None:
+                if not place_field_text(t, (anchor, y), pads, holes, taken, bodies):
+                    shove_text(t, (anchor, y), pads, holes, taken, bodies, max_radius=6.0)
+            else:
+                boxes.append(silk_reserve(item_box(t)))
     return boxes
 
 
@@ -218,76 +458,18 @@ def main():
     boxes = []
     placed = set()
     for ref, (x, y, rot) in FIXED.items():
-        center_at(fps[ref], x, y, rot)
-        boxes.append(bbox_mm(fps[ref]))
+        place_at(fps[ref], x, y, rot)
+        boxes.append(silk_reserve(bbox_mm(fps[ref])))
         placed.add(ref)
     boxes.append(KEEPOUT_XIAO)
     boxes += pin_labels(board, fps)
 
-    def pad_xy(pad):
-        p = pad.GetPosition()
-        return pcbnew.ToMM(p.x) - ORIGIN[0], pcbnew.ToMM(p.y) - ORIGIN[1]
+    missing = [p.ref for p in design.PARTS if p.ref not in placed]
+    if missing:
+        raise SystemExit(f"FIXED fehlt für: {', '.join(sorted(missing))}")
 
-    # Restliche Bauteile nahe an die schon platzierten Pads ihrer Netze (ohne GND), dichteste Bindung zuerst.
-    rest = [p for p in design.PARTS if p.ref not in placed]
-    while rest:
-        def anchors(p):
-            pts = []
-            for pad in fps[p.ref].Pads():
-                net = p.pins.get(pad.GetNumber())
-                if not net or net == design.GND:
-                    continue
-                for q in design.PARTS:
-                    if q.ref in placed:
-                        for qpad in fps[q.ref].Pads():
-                            if q.pins.get(qpad.GetNumber()) == net:
-                                pts.append(pad_xy(qpad))
-            return pts
-
-        rest.sort(key=lambda p: -len(anchors(p)))
-        p = rest.pop(0)
-        pts = anchors(p) or [(W / 2, H / 2)]
-        cx = sum(a for a, _ in pts) / len(pts)
-        cy = sum(b for _, b in pts) / len(pts)
-        fp = fps[p.ref]
-        best = None
-        for rot in (0, 90):
-            for ring in range(0, 120):
-                r = ring * 0.5
-                steps = max(1, int(2 * math.pi * r / 0.5))
-                for k in range(steps):
-                    a = 2 * math.pi * k / steps
-                    x, y = cx + r * math.cos(a), cy + r * math.sin(a)
-                    center_at(fp, x, y, rot)
-                    bb = bbox_mm(fp)
-                    if inside(bb) and not overlaps(bb, boxes):
-                        if best is None or r < best[0]:
-                            best = (r, x, y, rot)
-                        break
-                if best and best[0] <= r:
-                    break
-        if best is None:
-            raise SystemExit(f"no place for {p.ref}")
-        _, x, y, rot = best
-        center_at(fp, x, y, rot)
-        boxes.append(bbox_mm(fp))
-        placed.add(p.ref)
-
-    for fp in fps.values():
-        fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
-        fp.Reference().SetTextThickness(mm(0.12))
-        if fp.GetReference() in SHOW_VALUE:
-            fp.Value().SetLayer(pcbnew.F_SilkS)
-            fp.Value().SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
-            fp.Value().SetTextThickness(mm(0.12))
-        else:
-            fp.Value().SetVisible(False)
-
-    label(board, "SOLAR max 25V", 8.5, 7.5)
-    label(board, "AKKU LiFePO4 3,2V", 10.5, 46.5)
-    label(board, "SONDE 12V RS485", 90.5, 37.5)
-    label(board, "XIAO nRF52840 + Wio-SX1262 (USB ->)", 86, 30.5, 0.9)
-    label(board, "pegel-sender v1", 70, 67.5)
+    apply_project_models(fps)
+    layout_silk(board)
 
     pcbnew.SaveBoard(OUT, board)
     print("saved", OUT, len(fps), "footprints,", len(nets), "nets")

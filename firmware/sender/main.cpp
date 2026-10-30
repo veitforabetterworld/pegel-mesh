@@ -88,8 +88,23 @@ class SenderMesh : public mesh::Mesh {
   uint32_t next_status = 0;
   bool awaiting_reply = false;
   bool sensor_on = false;
+  bool battery_low = false;
   uint16_t bat_mv = 0;
   int16_t bat_ma = 0;
+
+#if PEGEL_BOARD
+  // true, solange der Akku als fast leer gilt. INA226 stumm: letzten Zustand behalten.
+  bool refreshBattery() {
+    if (!battery_read(bat_mv, bat_ma)) {
+      logf("battery: INA226 not responding\n");
+      return battery_low;
+    }
+    logf("battery %u mV %d mA\n", bat_mv, bat_ma);
+    if (bat_mv < PEGEL_BATTERY_LOW_MV) battery_low = true;
+    else if (bat_mv >= PEGEL_BATTERY_OK_MV) battery_low = false;
+    return battery_low;
+  }
+#endif
 
   /** LEVEL_OK with the level, or an error code of level_sensor.h. */
   uint8_t measureLevel(uint16_t& level_mm) {
@@ -104,22 +119,18 @@ class SenderMesh : public mesh::Mesh {
 #endif
   }
 
-  void sendReading() {
-    uint32_t measured_at = millis();
+  void transmit(uint8_t status, uint16_t level_mm, uint32_t measured_at) {
     PegelReading r;
-    uint8_t status = measureLevel(r.level_mm);
     if (status != LEVEL_OK) {
       // Statt eines Messwerts geht der Fehlercode über Funk; die Pegelseite zeigt ihn als Gerätestatus.
       r.level_mm = PEGEL_STATUS_BASE + status;
-      logf("sensor error %u\n", status);
+      logf("error %u\n", status);
+    } else {
+      r.level_mm = level_mm;
     }
     r.counter = ++counter;
     if (counter % CTR_SAVE_STEP == 0) saveCounter(counter);
     r.age_s = (uint8_t)min((millis() - measured_at) / 1000UL, 255UL);
-#if PEGEL_BOARD
-    if (battery_read(bat_mv, bat_ma)) logf("battery %u mV %d mA\n", bat_mv, bat_ma);
-    else logf("battery: INA226 not responding\n");
-#endif
 
     uint8_t buf[PEGEL_PKT_LEN];
     pegel_encode(PEGEL_HMAC_KEY, r, buf);
@@ -129,6 +140,12 @@ class SenderMesh : public mesh::Mesh {
     sendDirect(pkt, out_path, have_path ? out_path_len : 0);
     logf("TX #%lu level=%u mm %s\n", (unsigned long)r.counter, r.level_mm,
                   have_path ? "(direct path)" : "(zero hop)");
+  }
+
+  void sendReading() {
+    uint32_t measured_at = millis();
+    uint16_t level_mm = 0;
+    transmit(measureLevel(level_mm), level_mm, measured_at);
   }
 
   void sendRequest() {
@@ -214,15 +231,43 @@ public:
     }
 #if PEGEL_SENSOR
     // Sonde vor der Messung einschalten, damit sie bis zum Messzeitpunkt aufgewärmt ist.
+    // Bei fast leerem Akku aus lassen: der nächste Sendezeitpunkt meldet nur den Fehlercode.
     if (!sensor_on && due(now, next_send - PEGEL_SENSOR_WARMUP_MS)) {
-      level_sensor_power(true);
-      sensor_on = true;
+#if PEGEL_BOARD
+      refreshBattery();
+#endif
+      if (!battery_low) {
+        level_sensor_power(true);
+        sensor_on = true;
+      }
     }
 #endif
     if (due(now, next_send)) {
-      sendReading();   // schaltet die Sonde wieder ab
-      sensor_on = false;
-      next_send += PEGEL_INTERVAL_S * 1000UL;
+      bool low = false;
+#if PEGEL_BOARD
+      low = refreshBattery();
+#endif
+      if (low) {
+#if PEGEL_SENSOR
+        level_sensor_power(false);
+        sensor_on = false;
+#endif
+        transmit(LEVEL_BATTERY_LOW, 0, now);
+        next_send += PEGEL_INTERVAL_S * 1000UL;
+      }
+#if PEGEL_SENSOR
+      else if (!sensor_on) {
+        // Akku wieder über der Schwelle, Sonde war aus: erst aufwärmen, dann messen.
+        level_sensor_power(true);
+        sensor_on = true;
+        next_send = now + PEGEL_SENSOR_WARMUP_MS;
+      }
+#endif
+      else {
+        sendReading();   // schaltet die Sonde wieder ab
+        sensor_on = false;
+        next_send += PEGEL_INTERVAL_S * 1000UL;
+      }
     }
     if (due(now, next_status)) {
       next_status = now + 30000;

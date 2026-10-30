@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="520" viewBox="0 0 1380 520">
+  <style>
+    .box { fill:#f7f7f7; stroke:#222; stroke-width:2; }
+    .title { font: 600 18px sans-serif; fill:#111; }
+    .sub { font: 14px sans-serif; fill:#333; }
+    .arr { stroke:#333; stroke-width:2; fill:none; marker-end:url(#m); }
+  </style>
+  <defs>
+    <marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#333"/>
+    </marker>
+  </defs>
+  <text x="690" y="28" text-anchor="middle" style="font:600 20px sans-serif;fill:#111">pegel-sender — Blockschaltplan</text>
+  <rect class="box" x="40" y="48" width="170" height="88"/>
+<text class="title" x="125.0" y="76" text-anchor="middle">Solar</text>
+<text class="sub" x="125.0" y="98" text-anchor="middle">J1</text>
+<text class="sub" x="125.0" y="116" text-anchor="middle">MPPT etwa 18 V</text>
+<rect class="box" x="40" y="168" width="170" height="88"/>
+<text class="title" x="125.0" y="196" text-anchor="middle">12 V</text>
+<text class="sub" x="125.0" y="218" text-anchor="middle">J7 Netzteil</text>
+<text class="sub" x="125.0" y="236" text-anchor="middle">min. 1,5 A</text>
+<rect class="box" x="290" y="68" width="200" height="168"/>
+<text class="title" x="390.0" y="96" text-anchor="middle">CN3795</text>
+<text class="sub" x="390.0" y="118" text-anchor="middle">VSOL nach VSYS</text>
+<text class="sub" x="390.0" y="136" text-anchor="middle">3,61 V</text>
+<text class="sub" x="390.0" y="154" text-anchor="middle">mit und ohne Akku</text>
+<rect class="box" x="570" y="68" width="160" height="168"/>
+<text class="title" x="650.0" y="96" text-anchor="middle">VSYS</text>
+<text class="sub" x="650.0" y="118" text-anchor="middle">3,6 V System</text>
+<rect class="box" x="810" y="48" width="210" height="88"/>
+<text class="title" x="915.0" y="76" text-anchor="middle">TPS63900</text>
+<text class="sub" x="915.0" y="98" text-anchor="middle">3,3 V</text>
+<text class="sub" x="915.0" y="116" text-anchor="middle">LM66100 zum XIAO</text>
+<rect class="box" x="810" y="168" width="210" height="88"/>
+<text class="title" x="915.0" y="196" text-anchor="middle">TPS61040</text>
+<text class="sub" x="915.0" y="218" text-anchor="middle">12 V Sonde</text>
+<text class="sub" x="915.0" y="236" text-anchor="middle">Schaltbar über D0</text>
+<rect class="box" x="1100" y="48" width="230" height="88"/>
+<text class="title" x="1215.0" y="76" text-anchor="middle">XIAO nRF52840</text>
+<text class="sub" x="1215.0" y="98" text-anchor="middle">Wio-SX1262</text>
+<text class="sub" x="1215.0" y="116" text-anchor="middle">MeshCore-Sender</text>
+<rect class="box" x="40" y="360" width="250" height="110"/>
+<text class="title" x="165.0" y="388" text-anchor="middle">Akku optional</text>
+<text class="sub" x="165.0" y="410" text-anchor="middle">INA226, HY2112</text>
+<text class="sub" x="165.0" y="428" text-anchor="middle">LiFePO4 1S, J2</text>
+<rect class="box" x="360" y="360" width="270" height="110"/>
+<text class="title" x="495.0" y="388" text-anchor="middle">Frost / Heizung</text>
+<text class="sub" x="495.0" y="410" text-anchor="middle">Laden aus unter 0 °C</text>
+<text class="sub" x="495.0" y="428" text-anchor="middle">Heizung aus VSOL</text>
+<rect class="box" x="700" y="360" width="360" height="110"/>
+<text class="title" x="880.0" y="388" text-anchor="middle">RS485 Sonde</text>
+<text class="sub" x="880.0" y="410" text-anchor="middle">SC16IS740 + MAX3485</text>
+<text class="sub" x="880.0" y="428" text-anchor="middle">Klemme J3</text>
+<path class="arr" d="M 210.0 92.0 L 290.0 115.0"/>
+<path class="arr" d="M 210.0 212.0 L 290.0 189.0"/>
+<path class="arr" d="M 490.0 152.0 L 570.0 152.0"/>
+<path class="arr" d="M 730.0 115.0 L 810.0 92.0"/>
+<path class="arr" d="M 730.0 189.0 L 810.0 212.0"/>
+<path class="arr" d="M 1020.0 92.0 L 1100.0 92.0"/>
+<path class="arr" d="M 626.0 236.0 L 626.0 320.0 L 220.0 320.0 L 220.0 360.0"/>
+<path class="arr" d="M 666.0 236.0 L 666.0 320.0 L 454.5 320.0 L 454.5 360.0"/>
+<path class="arr" d="M 810.0 120.2 L 770.0 120.2 L 770.0 320.0 L 826.0 320.0 L 826.0 360.0"/>
+<path class="arr" d="M 915.0 256.0 L 952.0 360.0"/>
+</svg>

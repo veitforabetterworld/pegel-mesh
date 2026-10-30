@@ -4,6 +4,15 @@
 
 #include <stdint.h>
 
+// LiFePO4 1S: unter 2,8 V fast leer, Funk und 3,3 V laufen noch (Schutz trennt bei 2,1 V).
+// Einmal gemeldet, erst ab 3,0 V wieder Pegel — sonst flattert die Meldung an der Kennlinie.
+#ifndef PEGEL_BATTERY_LOW_MV
+#define PEGEL_BATTERY_LOW_MV  2800
+#endif
+#ifndef PEGEL_BATTERY_OK_MV
+#define PEGEL_BATTERY_OK_MV   3000
+#endif
+
 bool battery_begin();
 // Eine Messung (~20 ms). false, wenn der Chip nicht antwortet.
 bool battery_read(uint16_t& millivolt, int16_t& milliamp);

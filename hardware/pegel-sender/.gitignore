@@ -1,2 +1,16 @@
 build/
+build/step-venv/
 *.kicad_prl
+build/kicad-appimage/
+*.rpt
+fp-info-cache
+*-backups/
+*.kicad_pcb-bak
+
+# Schaltplan-Zwischenprodukte (export_schematic.py)
+preview/schematic/**/*.kicad_sch
+preview/schematic/**/*.svg
+preview/.goutputstream-*
+/schematic_wired
+fab/pos-raw.csv
+fab/preview-*.png
