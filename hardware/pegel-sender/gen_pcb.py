@@ -40,7 +40,7 @@ FIXED = {
     "J5": (86.38, 10, -90),
     "J6": (86.38, 25.24, -90),
     # Lader
-    "F1": (16, 4.5, 0), "D2": (16, 11, 90), "D1": (16, 20, 90),
+    "F1": (15.5, 4.5, 0), "D2": (17, 11, 90), "D1": (17, 20, 90),
     "C2": (24, 7, 0), "C3": (24, 14, 0), "C4": (28, 14, 90),
     "Q1": (35, 7, 0),
     "L1": (48, 10, 0),
@@ -51,19 +51,19 @@ FIXED = {
     # Akku
     "R8": (48, 29, 0),
     "U2": (40, 33, 0),
-    "Q2": (17, 50, 0), "Q3": (17, 57, 0), "U3": (25, 52, 0),
+    "Q2": (19, 50, 0), "Q3": (19, 57, 0), "U3": (27, 52, 0),
     # Versorgungen
     "U4": (72, 33, 0), "L2": (72, 38, 0),
-    "U5": (79, 45, 0), "L3": (73, 45, 0), "Q4": (85, 45, 0),
+    "U5": (75, 45, 0), "L3": (69, 45, 0), "Q4": (80, 42, 0),
     # RS485
-    "U6": (70, 55, 0), "Y1": (63, 55, 0), "U7": (82, 56, 0), "D6": (85, 63, 0),
+    "U6": (69, 55, 0), "Y1": (62, 55, 0), "U7": (78, 58, 0), "D6": (80, 63.5, 0), "JP1": (85, 61, 0),
     # Frost/Heizung
     "U8": (38, 46, 0), "TH1": (28, 41, 0), "Q6": (47, 50, 0), "Q7": (56, 63, 0),
     "R28": (22, 63, 90), "R29": (26, 63, 90), "R30": (30, 63, 90),
     "R31": (34, 63, 90), "R32": (38, 63, 90), "R33": (42, 63, 90),
 }
 
-KEEPOUT_XIAO = (77.0, 7.0, 99.0, 28.5)   # unter dem XIAO-Stapel nichts automatisch platzieren
+KEEPOUT_XIAO = (70.0, 7.0, 99.0, 31.5)   # unter dem XIAO-Stapel und seiner Beschriftung nichts automatisch platzieren
 MARGIN = 0.4
 
 
@@ -137,14 +137,48 @@ def outline(board):
         board.Add(s)
 
 
-def label(board, text, x, y, size=1.2):
+def label(board, text, x, y, size=1.2, align=0):
+    """Text auf F.SilkS; align -1 linksbündig ab x, 1 rechtsbündig bis x. Gibt die belegte Fläche zurück."""
     t = pcbnew.PCB_TEXT(board)
     t.SetText(text)
     t.SetPosition(pos(x, y))
     t.SetLayer(pcbnew.F_SilkS)
     t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
     t.SetTextThickness(mm(size * 0.15))
+    if align:
+        t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_LEFT if align < 0 else pcbnew.GR_TEXT_H_ALIGN_RIGHT)
     board.Add(t)
+    w = len(text) * size * 0.8
+    x1 = x - w / 2 if align == 0 else (x if align < 0 else x - w)
+    return (x1 - 0.3, y - size * 0.7 - 0.8, x1 + w + 0.3, y + size * 0.7 + 0.8)   # mit Luft zu Bauteilen
+
+
+# Beschriftung der Klemmen: Ref -> Text je Pin, steht neben dem Pin auf der Platinenseite der Klemme.
+PIN_LABELS = {
+    "J1": {"1": "+", "2": "-"},
+    "J2": {"1": "+", "2": "-"},
+    "J3": {"1": "V+ rot", "2": "V- schwarz", "3": "A weiss", "4": "B blau"},
+}
+# Bauteile, deren Wert auf dem Bestückungsdruck steht (Lötbrücken, optionaler Stecker).
+SHOW_VALUE = {"JP1", "JP2", "J4"}
+
+
+def pin_labels(board, fps):
+    boxes = []
+    for ref, texts in PIN_LABELS.items():
+        fp = fps[ref]
+        l, _, r, _ = bbox_mm(fp)
+        right_side = (l + r) / 2 < W / 2   # linke Klemmen: Text rechts daneben, rechte Klemmen: links daneben
+        for pad in fp.Pads():
+            text = texts.get(pad.GetNumber())
+            if not text:
+                continue
+            y = pcbnew.ToMM(pad.GetPosition().y) - ORIGIN[1]
+            if right_side:
+                boxes.append(label(board, text, r + 0.6, y, 1.2, -1))
+            else:
+                boxes.append(label(board, text, l - 0.6, y, 0.9, 1))
+    return boxes
 
 
 def main():
@@ -188,6 +222,7 @@ def main():
         boxes.append(bbox_mm(fps[ref]))
         placed.add(ref)
     boxes.append(KEEPOUT_XIAO)
+    boxes += pin_labels(board, fps)
 
     def pad_xy(pad):
         p = pad.GetPosition()
@@ -241,11 +276,16 @@ def main():
     for fp in fps.values():
         fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
         fp.Reference().SetTextThickness(mm(0.12))
-        fp.Value().SetVisible(False)
+        if fp.GetReference() in SHOW_VALUE:
+            fp.Value().SetLayer(pcbnew.F_SilkS)
+            fp.Value().SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
+            fp.Value().SetTextThickness(mm(0.12))
+        else:
+            fp.Value().SetVisible(False)
 
-    label(board, "SOLAR", 6.5, 7.5)
-    label(board, "AKKU LiFePO4", 9, 46.5)
-    label(board, "SONDE", 93, 37.5)
+    label(board, "SOLAR max 25V", 8.5, 7.5)
+    label(board, "AKKU LiFePO4 3,2V", 10.5, 46.5)
+    label(board, "SONDE 12V RS485", 90.5, 37.5)
     label(board, "XIAO nRF52840 + Wio-SX1262 (USB ->)", 86, 30.5, 0.9)
     label(board, "pegel-sender v1", 70, 67.5)
 

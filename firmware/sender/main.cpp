@@ -15,6 +15,9 @@
 
 #include "pegel_packet.h"
 #include "level_sensor.h"
+#if PEGEL_BOARD
+  #include "battery.h"
+#endif
 #include PEGEL_SECRETS
 
 using namespace Adafruit_LittleFS_Namespace;
@@ -84,6 +87,9 @@ class SenderMesh : public mesh::Mesh {
   uint32_t reply_deadline = 0;
   uint32_t next_status = 0;
   bool awaiting_reply = false;
+  bool sensor_on = false;
+  uint16_t bat_mv = 0;
+  int16_t bat_ma = 0;
 
   /** LEVEL_OK with the level, or an error code of level_sensor.h. */
   uint8_t measureLevel(uint16_t& level_mm) {
@@ -110,6 +116,10 @@ class SenderMesh : public mesh::Mesh {
     r.counter = ++counter;
     if (counter % CTR_SAVE_STEP == 0) saveCounter(counter);
     r.age_s = (uint8_t)min((millis() - measured_at) / 1000UL, 255UL);
+#if PEGEL_BOARD
+    if (battery_read(bat_mv, bat_ma)) logf("battery %u mV %d mA\n", bat_mv, bat_ma);
+    else logf("battery: INA226 not responding\n");
+#endif
 
     uint8_t buf[PEGEL_PKT_LEN];
     pegel_encode(PEGEL_HMAC_KEY, r, buf);
@@ -202,14 +212,22 @@ public:
       sendRequest();
       next_check = now + (have_path ? PATH_CHECK_INTERVAL_MS : DISCOVER_RETRY_MS);
     }
+#if PEGEL_SENSOR
+    // Sonde vor der Messung einschalten, damit sie bis zum Messzeitpunkt aufgewärmt ist.
+    if (!sensor_on && due(now, next_send - PEGEL_SENSOR_WARMUP_MS)) {
+      level_sensor_power(true);
+      sensor_on = true;
+    }
+#endif
     if (due(now, next_send)) {
-      sendReading();
+      sendReading();   // schaltet die Sonde wieder ab
+      sensor_on = false;
       next_send += PEGEL_INTERVAL_S * 1000UL;
     }
     if (due(now, next_status)) {
       next_status = now + 30000;
-      logf("status: up %lus counter=%lu path=%s\n", (unsigned long)(now / 1000), (unsigned long)counter,
-                    have_path ? "yes" : "no");
+      logf("status: up %lus counter=%lu path=%s bat=%umV\n", (unsigned long)(now / 1000), (unsigned long)counter,
+                    have_path ? "yes" : "no", bat_mv);
     }
   }
 };
@@ -228,6 +246,9 @@ void setup() {
   InternalFS.begin();
 #if PEGEL_SENSOR
   level_sensor_begin();
+#endif
+#if PEGEL_BOARD
+  if (!battery_begin()) logf("battery: INA226 not found\n");
 #endif
   the_mesh.begin();
 }

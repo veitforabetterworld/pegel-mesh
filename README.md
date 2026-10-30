@@ -33,3 +33,19 @@ py -3.12 tools/pio.py device monitor -b 115200 -p COMx
 
 `secrets/keys.json` enthält alle Schlüssel. Geht die Datei verloren, müssen alle Geräte
 neu geflasht werden. Sicher aufbewahren!
+
+## Trägerplatine
+
+[hardware/pegel-sender](hardware/pegel-sender): Solar-MPPT-Lader (3 A), LiFePO4-Schutz und -Messung,
+3,3 V für den XIAO, schaltbare 12 V und RS485 für die Sonde, Frostsperre mit Platinenheizung.
+Auslegung in [hardware/KONZEPT.md](hardware/KONZEPT.md), Fertigungsdaten für PCBWay in
+`hardware/pegel-sender/fab/`.
+
+| Klemme | Belegung |
+|---|---|
+| SOLAR | + / − (Panel bis 25 V Leerlauf) |
+| AKKU | + / − (LiFePO4 1S) |
+| SONDE | V+ rot, V− schwarz, A weiß, B blau |
+
+Die Sender-Firmware baut standardmäßig für die Platine (`PEGEL_BOARD=1` in `pegel.ini`);
+für den fliegenden Aufbau mit RS485-Modul an `Serial1` `PEGEL_BOARD=0` setzen.
