@@ -1,6 +1,6 @@
 """Pegel-Sender-Platine: Bauteile, Werte, Footprints, Herstellernummern und Netze.
 
-Einzige Quelle für Schaltplan (schematic_wired.py) und Platine (gen_pcb.py). Pin-Nummern sind die der Footprint-Pads.
+Einzige Quelle für Schaltplan (schematic.py) und Platine (gen_pcb.py). Pin-Nummern sind die der Footprint-Pads.
 Platinenbeschreibung: README.md im Repo-Root.
 """
 
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Part:
     ref: str
-    symbol: str          # "Lib:Name" (KiCad) oder "pegel:Name" (Box-Symbol in schematic_wired.py)
+    symbol: str          # "Lib:Name" (KiCad) oder "pegel:Name" (Kastensymbol aus sch_symbols.py)
     footprint: str       # "Lib:Name"
     value: str
     mpn: str             # Herstellernummer für die PCBWay-Bestückung ("" = nicht bestückt / mechanisch)

@@ -7,10 +7,10 @@ fp-info-cache
 *-backups/
 *.kicad_pcb-bak
 
-# Schaltplan-Zwischenprodukte (export_schematic.py)
+# Schaltplan-Zwischenprodukte (schematic.py)
 preview/schematic/**/*.kicad_sch
 preview/schematic/**/*.svg
+preview/schematic/*.net
 preview/.goutputstream-*
-/schematic_wired
 fab/pos-raw.csv
 fab/preview-*.png

@@ -111,13 +111,13 @@ Im Verzeichnis `hardware/pegel-sender/`:
 3. `route.py build/freerouting.jar` — DRC: 0 offen, 0 Kurzschluss/Kreuzung, 0 Siebdruck-Verstöße  
 4. `export.py` — Gerber/BOM/CPL nach `fab/`  
 5. `render_preview.py` — 3D-Bilder nach `preview/`  
-6. `schematic_blocks.py` — Blockschaltplan; `export_schematic.py` — Schaltplan je Funktionsblock  
+6. `schematic_blocks.py` — Blockschaltplan; `schematic.py` — Schaltplan je Funktionsblock, gegen die KiCad-Netzliste geprüft  
 
 **Platine neu erzeugen:** `python3 relayout.py` (Schritte 2–5). Bauteilpositionen stehen in `fixed_positions.py`; nach manueller Verschiebung in KiCad: KiCad-Python `dump_fixed.py` → `fixed_positions.py` aktualisieren, dann `relayout.py`.
 
 **Nur Siebdruck** auf gültiger Platine: KiCad-Python `gen_pcb.layout_silk(board)` speichern, dann `render_preview.py`.
 
-Quelle für Bauteile und Netze: [`design.py`](hardware/pegel-sender/design.py). Schaltplan-Grafiken: `schematic_wired.py`. L1-3D: `3dmodels/L_Bourns_SRP1245A.step` (KiCad-2313AA-STEP auf 13,5×12,5×4,8 mm skaliert in `gen_pcb.py`).
+Quelle für Bauteile und Netze: [`design.py`](hardware/pegel-sender/design.py). Schaltplan-Grafiken: [`schematic.py`](hardware/pegel-sender/schematic.py) — ICs oben, passive Bauteile im Raster darunter, Verbindungen über Netzlabels und Versorgungssymbole; Symbolzugriff in `sch_symbols.py`. L1-3D: `3dmodels/L_Bourns_SRP1245A.step` (KiCad-2313AA-STEP auf 13,5×12,5×4,8 mm skaliert in `gen_pcb.py`).
 
 Platine 100 × 70 mm, 2 Lagen. Vor PCB-Bestellung Abstand der XIAO-Buchsen am realen Stapel messen (Soll 15,24 mm Reihenabstand). Siebdruck: `(c) Veit Götz`.
 
