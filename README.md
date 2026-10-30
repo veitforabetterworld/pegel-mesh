@@ -117,7 +117,7 @@ Im Verzeichnis `hardware/pegel-sender/`:
 
 **Nur Siebdruck** auf gültiger Platine: KiCad-Python `gen_pcb.layout_silk(board)` speichern, dann `render_preview.py`.
 
-Quelle für Bauteile und Netze: [`design.py`](hardware/pegel-sender/design.py). Schaltplan-Grafiken: [`schematic.py`](hardware/pegel-sender/schematic.py) — ICs oben, passive Bauteile im Raster darunter, Verbindungen über Netzlabels und Versorgungssymbole; Symbolzugriff in `sch_symbols.py`. L1-3D: `3dmodels/L_Bourns_SRP1245A.step` (KiCad-2313AA-STEP auf 13,5×12,5×4,8 mm skaliert in `gen_pcb.py`).
+Quelle für Bauteile und Netze: [`design.py`](hardware/pegel-sender/design.py). Schaltplan-Grafiken: [`schematic.py`](hardware/pegel-sender/schematic.py) — Lage der Bauteile je Blatt in [`schematic_layout.py`](hardware/pegel-sender/schematic_layout.py) (Signalfluss links → rechts, Versorgung oben, Masse unten), Leitungen verlegt ein rechtwinkliger Router; Labels nur für Netze, die das Blatt verlassen. Zweipole dreht der Generator selbst (Versorgung oben, Masse unten). Symbolzugriff in `sch_symbols.py`. L1-3D: `3dmodels/L_Bourns_SRP1245A.step` (KiCad-2313AA-STEP auf 13,5×12,5×4,8 mm skaliert in `gen_pcb.py`).
 
 Platine 100 × 70 mm, 2 Lagen. Vor PCB-Bestellung Abstand der XIAO-Buchsen am realen Stapel messen (Soll 15,24 mm Reihenabstand). Siebdruck: `(c) Veit Götz`.
 

@@ -66,21 +66,21 @@ g = "charger"
 add("U1", "pegel:CN3795", "Package_SO:SSOP-10_3.9x4.9mm_P1.00mm", "CN3795", "Consonance CN3795",
     {"1": "CHG_VG", "2": GND, "3": "CHG_LED", "4": "MPPT", "5": "CHG_COM", "6": "CHG_FB", "7": "VSYS",
      "8": "CHG_CSP", "9": "VSOL", "10": "CHG_DRV"}, g)
-c("C1", "100nF", "CHG_VG", "VSOL", C0603, "CAP 100nF 50V X7R 0603", g)
+c("C1", "100nF 50V", "CHG_VG", "VSOL", C0603, "CAP 100nF 50V X7R 0603", g)
 add("C2", "Device:C_Polarized", "Capacitor_SMD:CP_Elec_8x10", "100uF 35V", "Panasonic EEE-FK1V101P", {"1": "VSOL", "2": GND}, g)
-c("C3", "10uF", "VSOL", GND, C1210, "CAP 10uF 50V X7R 1210", g)
-c("C4", "100nF", "VSOL", GND, C0603, "CAP 100nF 50V X7R 0603", g)
+c("C3", "10uF 50V", "VSOL", GND, C1210, "CAP 10uF 50V X7R 1210", g)
+c("C4", "100nF 50V", "VSOL", GND, C0603, "CAP 100nF 50V X7R 0603", g)
 add("Q1", "Device:Q_PMOS", "Package_TO_SOT_SMD:TO-252-2", "AOD4189", "AOS AOD4189 (-40 V)",
     {"1": "CHG_DRV", "2": "CHG_SW", "3": "VSOL"}, g)
 add("D3", "Device:D_Schottky", "Diode_SMD:D_SMC", "B540C", "Diodes B540C-13-F (40 V 5 A)", {"1": "CHG_SW", "2": GND}, g)
 add("L1", "Device:L", "Inductor_SMD:L_Bourns_SRP1245A", "15uH", "Bourns SRP1245A-150M", {"1": "CHG_SW", "2": "CHG_CSP"}, g)
-r("R1", "40m", "CHG_CSP", "VSYS", R2512, "RES 40mOhm 1% 2W 2512", g)
+r("R1", "40m 2W", "CHG_CSP", "VSYS", R2512, "RES 40mOhm 1% 2W 2512", g)
 r("R2", "200k", "VSYS", "CHG_FB", group=g)
 r("R3", "100k", "CHG_FB", GND, group=g)
 r("R4", "300k", "VSOL", "MPPT", group=g)
 r("R5", "21.5k", "MPPT", GND, group=g)
 r("R6", "120", "CHG_COM", "CHG_COMC", group=g)
-c("C5", "220nF", "CHG_COMC", GND, group=g)
+c("C5", "220nF 16V", "CHG_COMC", GND, group=g)
 # Unter ~14 V (Netzteil) liegt 330k parallel zu R4, damit der MPPT-Pin bei 12 V über 1,205 V bleibt.
 # Q9 ist ohne Versorgung an (Teiler entspannt), sonst startet der Lader aus 12 V nicht.
 # U10 zieht nur bei hoher Panelspannung Q11 auf und schaltet Q9 ab. Hysterese etwa 13–15 V.
@@ -95,7 +95,7 @@ add("U10", "Comparator:TLV3401", "Package_TO_SOT_SMD:SOT-23-5", "TLV3401", "TI T
     {"1": "MPPT_EN", "2": GND, "3": "VSOL_DIV", "4": "MPPT_REF", "5": "VSYS"}, g)
 r("R44", "1M", "MPPT_EN", "VSOL_DIV", group=g)
 r("R45", "1M", "MPPT_EN", "VSYS", group=g)
-c("C21", "100nF", "VSYS", GND, group=g)
+c("C21", "100nF 16V", "VSYS", GND, group=g)
 add("Q11", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002",
     {"1": "MPPT_EN", "2": GND, "3": "MPPT_NG"}, g)
 r("R50", "1M", "VSOL", "MPPT_NG", group=g)
@@ -110,17 +110,17 @@ add("D10", "Device:D_Zener", "Diode_SMD:D_SOD-123", "10V", "BZT52C10", {"1": "VS
 r("R47", "330k", "MPPT_PULL", "MPPT", group=g)
 g = "charger"   # Ausgangskondensatoren und Lade-LED gehören zum Lader
 add("C6", "Device:C_Polarized", "Capacitor_SMD:CP_Elec_6.3x7.7", "100uF 10V", "Panasonic EEE-FK1A101P", {"1": "VSYS", "2": GND}, g)
-c("C7", "10uF", "VSYS", GND, C1206, "CAP 10uF 16V X7R 1206", g)
+c("C7", "10uF 16V", "VSYS", GND, C1206, "CAP 10uF 16V X7R 1206", g)
 add("D4", "Device:LED", "LED_SMD:LED_0805_2012Metric", "rot", "LED rot 0805", {"1": "CHG_LED", "2": "CHG_LEDA"}, g)
 r("R7", "10k", "CHG_LEDA", "VSOL", R0805, "RES 10k 1% 0805", g)
 
 # ---------------------------------------------------------------- Akku: Messung (INA226) und Schutz (HY2112 + 2× FS8205A)
 g = "battery"
-r("R8", "10m", "VSYS", "BAT_P", R2512, "RES 10mOhm 1% 2W 2512", g)
+r("R8", "10m 2W", "VSYS", "BAT_P", R2512, "RES 10mOhm 1% 2W 2512", g)
 add("U2", "Sensor_Energy:INA226", "Package_SO:TSSOP-10_3x3mm_P0.5mm", "INA226", "TI INA226AIDGSR",
     {"1": GND, "2": GND, "3": "", "4": "I2C_SDA", "5": "I2C_SCL", "6": "+3V3", "7": GND, "8": "INA_M",
      "9": "INA_M", "10": "INA_P"}, g)
-c("C8", "100nF", "+3V3", GND, group=g)
+c("C8", "100nF 16V", "+3V3", GND, group=g)
 # Kelvin-Messleitungen vom Shunt; 10 Ω begrenzen den Strom bei Fehlern (Verstärkungsfehler < 0,1 %).
 r("R37", "10", "VSYS", "INA_P", group=g)
 r("R38", "10", "BAT_P", "INA_M", group=g)
@@ -129,7 +129,7 @@ add("J2", "Connector:Screw_Terminal_01x02", "TerminalBlock_Phoenix:TerminalBlock
 add("U3", "pegel:HY2112", "Package_TO_SOT_SMD:SOT-23-6", "HY2112-CB", "HYCON HY2112-CB",
     {"1": "PROT_OD", "2": "PROT_CS", "3": "PROT_OC", "4": "", "5": "PROT_VDD", "6": "BAT_N"}, g)
 r("R9", "330", "BAT_P", "PROT_VDD", group=g)
-c("C9", "100nF", "PROT_VDD", "BAT_N", group=g)
+c("C9", "100nF 16V", "PROT_VDD", "BAT_N", group=g)
 r("R10", "2k", "PROT_CS", GND, group=g)
 r("R49", "100k", "BAT_N", GND, group=g)   # ohne Zelle liegt VSS nicht offen an VSYS
 for i, ref in enumerate(("Q2", "Q3")):
@@ -144,13 +144,13 @@ add("U4", "Regulator_Switching:TPS63900", "Package_SON:WSON-10-1EP_2.5x2.5mm_P0.
      "9": "BB_LX1", "10": "VSYS", "11": GND}, g)
 r("R11", "36.5k", "BB_CFG1", GND, group=g)
 add("L2", "Device:L", "Inductor_SMD:L_Taiyo-Yuden_NR-30xx", "2.2uH", "Taiyo Yuden NR3015T2R2M", {"1": "BB_LX1", "2": "BB_LX2"}, g)
-c("C10", "10uF", "VSYS", GND, C0805, "CAP 10uF 10V X5R 0805", g)
-c("C11", "22uF", "+3V3", GND, C0805, "CAP 22uF 6.3V X5R 0805", g)
+c("C10", "10uF 10V", "VSYS", GND, C0805, "CAP 10uF 10V X5R 0805", g)
+c("C11", "22uF 6.3V", "+3V3", GND, C0805, "CAP 22uF 6.3V X5R 0805", g)
 # Ideale Diode: Wandler speist den XIAO, USB-3,3 V kann nicht auf +3V3 und den Akku zurück.
 # CE an VOUT: steigt der XIAO-Pin über die Wandlerseite, sperrt der Schalter.
 add("U9", "Power_Protection:LM66100", "Package_TO_SOT_SMD:SOT-363_SC-70-6", "LM66100", "TI LM66100DCKR",
     {"1": "+3V3", "2": GND, "3": "XIAO_3V3", "4": "", "5": GND, "6": "XIAO_3V3"}, g)
-c("C20", "1uF", "XIAO_3V3", GND, C0603, "CAP 1uF 10V X5R 0603", g)
+c("C20", "1uF 10V", "XIAO_3V3", GND, C0603, "CAP 1uF 10V X5R 0603", g)
 
 # ---------------------------------------------------------------- 12 V für die Sonde: TPS61040 + Lastschalter
 g = "12v"
@@ -160,9 +160,9 @@ add("L3", "Device:L", "Inductor_SMD:L_Taiyo-Yuden_NR-30xx", "10uH", "Taiyo Yuden
 add("D5", "Device:D_Schottky", "Diode_SMD:D_SOD-123", "MBR0540", "onsemi MBR0540T1G (40 V)", {"1": "V12_RAW", "2": "BST_SW"}, g)
 r("R12", "820k", "V12_RAW", "BST_FB", group=g)
 r("R13", "91k", "BST_FB", GND, group=g)
-c("C12", "22pF", "V12_RAW", "BST_FB", group=g)
-c("C13", "4.7uF", "V12_RAW", GND, C1206, "CAP 4.7uF 25V X7R 1206", g)
-c("C14", "4.7uF", "VSYS", GND, C0805, "CAP 4.7uF 10V X5R 0805", g)
+c("C12", "22pF 50V", "V12_RAW", "BST_FB", group=g)
+c("C13", "4.7uF 25V", "V12_RAW", GND, C1206, "CAP 4.7uF 25V X7R 1206", g)
+c("C14", "4.7uF 10V", "VSYS", GND, C0805, "CAP 4.7uF 10V X5R 0805", g)
 r("R14", "100k", "SENS_EN", GND, group=g)
 add("Q4", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "AO3401A", "AOS AO3401A",
     {"1": "PSW_G", "2": "V12_RAW", "3": "V12_PROBE"}, g)
@@ -177,17 +177,17 @@ add("U6", "Interface_UART:SC16IS740", "Package_SO:TSSOP-16_4.4x5mm_P0.65mm", "SC
     {"1": "+3V3", "2": "+3V3", "3": "+3V3", "4": "", "5": "I2C_SCL", "6": "I2C_SDA", "7": "", "8": "+3V3",
      "9": GND, "10": "UART_RTS", "11": GND, "12": "UART_TX", "13": "UART_RX", "14": "UART_RST", "15": "XTAL1",
      "16": "XTAL2"}, g)
-c("C15", "100nF", "+3V3", GND, group=g)
+c("C15", "100nF 16V", "+3V3", GND, group=g)
 r("R16", "10k", "UART_RST", "+3V3", group=g)
 r("R36", "10k", "UART_RX", "+3V3", group=g)   # RO ist beim Senden hochohmig
 add("Y1", "Device:Crystal_GND24", "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm", "14.7456MHz", "Crystal 14.7456 MHz 3225 18pF",
     {"1": "XTAL1", "2": GND, "3": "XTAL2", "4": GND}, g)
-c("C16", "27pF", "XTAL1", GND, group=g)   # 18-pF-Quarz, Streuung ~4,5 pF: 2*(18-4,5)
-c("C17", "27pF", "XTAL2", GND, group=g)
+c("C16", "27pF 50V", "XTAL1", GND, group=g)   # 18-pF-Quarz, Streuung ~4,5 pF: 2*(18-4,5)
+c("C17", "27pF 50V", "XTAL2", GND, group=g)
 add("U7", "Interface_UART:MAX3485", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "MAX3485", "MAX3485ESA+T",
     {"1": "UART_RX", "2": "UART_RTS", "3": "UART_RTS", "4": "UART_TX", "5": GND, "6": "RS485_A", "7": "RS485_B",
      "8": "+3V3"}, g)
-c("C18", "100nF", "+3V3", GND, group=g)
+c("C18", "100nF 16V", "+3V3", GND, group=g)
 r("R17", "10k", "RS485_A", "+3V3", group=g)
 r("R18", "10k", "RS485_B", GND, group=g)
 add("JP1", "Jumper:SolderJumper_2_Open", "Jumper:SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm", "120R ein", "",
@@ -217,7 +217,7 @@ r("R23", "499k", "T_REF2", GND, group=g)
 # den FETs löst beim HY2112 den Entlade-Überstrom (100–200 mV) aus und trennt den Akku.
 add("U8", "Comparator:LM393", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "TLV3402", "TI TLV3402IDR",
     {"1": "CHG_INHIBIT", "2": "T_REF0", "3": "T_NTC", "4": GND, "5": "T_REF2", "6": "T_NTC", "7": "HEAT_OFF", "8": "VSYS"}, g)
-c("C19", "100nF", "VSYS", GND, group=g)
+c("C19", "100nF 16V", "VSYS", GND, group=g)
 r("R48", "1M", "CHG_INHIBIT", "VSYS", group=g)
 add("Q10", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002",
     {"1": "CHG_INHIBIT", "2": GND, "3": "MPPT"}, g)
@@ -230,7 +230,7 @@ add("D7", "Device:D_Zener", "Diode_SMD:D_SOD-123", "12V", "BZT52C12", {"1": "HEA
 add("Q7", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "SI2318CDS", "Vishay SI2318CDS (40 V)",
     {"1": "HEAT_G", "2": GND, "3": "HEAT_N"}, g)
 for i in range(6):
-    r(f"R{28 + i}", "390", "VSOL", "HEAT_N", R2512, "RES 390R 1% 2W 2512", g)
+    r(f"R{28 + i}", "390 2W", "VSOL", "HEAT_N", R2512, "RES 390R 1% 2W 2512", g)
 
 # ---------------------------------------------------------------- XIAO nRF52840 + Wio-SX1262 (gesteckt)
 g = "xiao"

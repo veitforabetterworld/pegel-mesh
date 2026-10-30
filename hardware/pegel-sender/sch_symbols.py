@@ -164,12 +164,12 @@ def symbol_pin_of(part: design.Part, pad: str) -> str:
 
 # Kastensymbole für Bauteile ohne KiCad-Symbol: Pinname je Nummer, links und rechts von oben nach unten.
 BOX_PINS = {
-    "CN3795": ({"9": "VCC", "1": "VG", "4": "MPPT", "5": "COM", "2": "GND"},
-               {"10": "DRV", "8": "CSP", "7": "BAT", "6": "FB", "3": "CHRG"}),
-    "HY2112": ({"5": "VDD", "6": "VSS", "4": "NC"}, {"1": "OD", "3": "OC", "2": "CS"}),
-    "FS8205A": ({"2": "S1", "3": "S1", "4": "G1"}, {"7": "S2", "6": "S2", "5": "G2", "1": "D", "8": "D"}),
-    "TLV3401": ({"3": "IN+", "4": "IN-", "5": "V+", "2": "V-"}, {"1": "OUT"}),
-    "LM66100": ({"1": "VIN", "3": "CE", "5": "ST"}, {"6": "VOUT", "2": "GND", "4": "NC"}),
+    "CN3795": ({"10": "DRV", "9": "VCC", "1": "VG", "4": "MPPT", "5": "COM"},
+               {"8": "CSP", "7": "BAT", "3": "CHRG", "6": "FB", "2": "GND"}),
+    "HY2112": ({"5": "VDD", "6": "VSS", "1": "OD"}, {"3": "OC", "2": "CS", "4": "NC"}),
+    "FS8205A": ({"1": "D", "8": "D", "2": "S1", "3": "S1", "4": "G1"}, {"5": "G2", "7": "S2", "6": "S2"}),
+    "TLV3401": ({"3": "IN+", "4": "IN-"}, {"5": "V+", "1": "OUT", "2": "V-"}),
+    "LM66100": ({"1": "VIN", "3": "CE", "5": "ST"}, {"6": "VOUT", "4": "NC", "2": "GND"}),
 }
 
 
