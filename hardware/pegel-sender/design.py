@@ -108,6 +108,7 @@ add("Q9", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "AO3401A", "AOS AO3401A"
 r("R46", "100k", "VSOL", "MPPT_GATE", group=g)
 add("D10", "Device:D_Zener", "Diode_SMD:D_SOD-123", "10V", "BZT52C10", {"1": "VSOL", "2": "MPPT_GATE"}, g)
 r("R47", "330k", "MPPT_PULL", "MPPT", group=g)
+g = "charger"   # Ausgangskondensatoren und Lade-LED gehören zum Lader
 add("C6", "Device:C_Polarized", "Capacitor_SMD:CP_Elec_6.3x7.7", "100uF 10V", "Panasonic EEE-FK1A101P", {"1": "VSYS", "2": GND}, g)
 c("C7", "10uF", "VSYS", GND, C1206, "CAP 10uF 16V X7R 1206", g)
 add("D4", "Device:LED", "LED_SMD:LED_0805_2012Metric", "rot", "LED rot 0805", {"1": "CHG_LED", "2": "CHG_LEDA"}, g)

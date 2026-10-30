@@ -102,7 +102,7 @@ Schaltplan je Funktionsblock (Symbole und Leitungen):
 |---|---|
 | Linux (Arch/Manjaro) | `pacman -S kicad kicad-library jre-openjdk` |
 | Linux (ohne root) | KiCad-AppImage nach `hardware/pegel-sender/build/kicad-appimage/` ([Download](https://www.kicad.org/download/linux/)); beim ersten Lauf extrahiert [`kicad_env.py`](hardware/pegel-sender/kicad_env.py) `squashfs-root` |
-| Windows | KiCad-Python und `kicad-cli.exe` neben der Installation |
+| Windows | KiCad-Installer; `kicad_env.py` findet KiCad-Python und `kicad-cli.exe` unter `%LOCALAPPDATA%\Programs\KiCad` bzw. `Program Files\KiCad`. Schaltplan-PNGs: `py -m pip install pymupdf` (statt `rsvg-convert`) |
 
 Im Verzeichnis `hardware/pegel-sender/`:
 

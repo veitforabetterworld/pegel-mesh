@@ -16,6 +16,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import design  # noqa: E402
 import kicad_env  # noqa: E402
+from svg_png import svg_to_png  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PREVIEW = os.path.join(HERE, "preview")
@@ -822,11 +823,33 @@ def try_pin_at(part, spec, unit, sym, tx, ty, want, occupied, geoms, boxed):
     return add_geom(part, cx, cy, rot, spec, unit, occupied, geoms, boxed)
 
 
+def facing_rot(part, spec, cx, cy, geoms) -> int:
+    """0 oder 180 Grad für ein einteiliges IC: die Seite mit den Netzen der schon platzierten Bauteile
+    zeigt zu ihnen. Sonst laufen Leitungen um den Körper herum und schließen andere Abgänge ein."""
+    placed = index_pins(geoms)
+    best = (None, 0)
+    for rot in (0, 180):
+        cost = 0.0
+        for pin in make_pins(part, cx, cy, rot, spec):
+            others = placed.get(pin.net, [])
+            if pin.net in POWER or not others:
+                continue
+            ex = pin.x + pin.dx * STUB
+            cost += min(abs(ex - o.x) for o in others)
+        if best[0] is None or cost < best[0]:
+            best = (cost, rot)
+    return best[1]
+
+
 def place_anchors(parts, pin_map, unit_map, occupied, geoms, boxed):
     cursor = 34.0
     for part in order_parts([p for p in parts if part_kind(p) == "anchor"]):
         units = unit_map.get(part.symbol) or {1: pin_map.get(part.symbol, [])}
         rot = anchor_rot(part)
+        if part.ref.startswith("U") and len(units) == 1 and geoms:
+            spec = next(iter(units.values()))
+            hx0 = max(8.0, half_extent(spec, 0)[0])
+            rot = facing_rot(part, spec, snap(cursor + hx0), snap(32.0 + half_extent(spec, 0)[1]), geoms)
         hx = 8.0
         for _unit, spec in units.items():
             hx = max(hx, half_extent(spec, rot)[0])
@@ -1696,7 +1719,8 @@ class Maze:
         return segs, self.xy(goal), dx, dy, rect
 
 
-def layout_sheet(parts, pin_map, unit_map, boxed, outside):
+def layout_sheet(parts, pin_map, unit_map, boxed, outside, label_first=frozenset()):
+    """label_first: Netze, deren Label zuerst gesetzt wird (sonst blockiert ein früheres Label den Abgang)."""
     geoms = []
     occupied = []
     place_anchors(parts, pin_map, unit_map, occupied, geoms, boxed)
@@ -1803,7 +1827,7 @@ def layout_sheet(parts, pin_map, unit_map, boxed, outside):
 
     labels = []
     missing = []
-    for net, ends in stubs.items():
+    for net, ends in sorted(stubs.items(), key=lambda item: item[0] not in label_first):
         if net not in outside and len(ends) != 1:
             continue
         sources = set()
@@ -2042,9 +2066,14 @@ def extend_through_pins(segs, geoms) -> list[tuple]:
 
 
 def write_sheet(key, title, parts, outside, lib_text, pin_map, unit_map, boxed) -> list[str]:
-    geoms, segs, labels, fields, powers, text_boxes, missing = layout_sheet(
-        parts, pin_map, unit_map, boxed, outside,
-    )
+    label_first: set[str] = set()
+    for _attempt in range(3):
+        geoms, segs, labels, fields, powers, text_boxes, missing = layout_sheet(
+            parts, pin_map, unit_map, boxed, outside, frozenset(label_first),
+        )
+        if not missing or set(missing) <= label_first:
+            break
+        label_first.update(missing)   # neuer Durchgang, diese Labels vor allen anderen
     errors = check_sheet(key, geoms, segs, text_boxes)
     for net in missing:
         errors.append(f"{key}: Label {net} fehlt")
@@ -2119,10 +2148,7 @@ def write_sheet(key, title, parts, outside, lib_text, pin_map, unit_map, boxed) 
     if not svgs:
         raise SystemExit(f"kein SVG für {key}")
     png = os.path.join(PREVIEW, f"schematic-{key}.png")
-    if shutil.which("rsvg-convert"):
-        subprocess.run(["rsvg-convert", "-w", "1800", "-o", png, svgs[0]], check=True)
-    else:
-        print("rsvg-convert fehlt: PNG nicht erneuert, SVG in", svg_dir)
+    svg_to_png(svgs[0], png, 1800)
     print("wrote", png, f"{page_w:.0f}x{page_h:.0f} mm,", len(parts), "parts", f"{len(errors)} Konflikte")
     return errors
 

@@ -1,7 +1,8 @@
 """Blockschaltplan als SVG/PNG nach preview/. Aufruf: python3 schematic_blocks.py"""
 
 import os
-import subprocess
+
+from svg_png import svg_to_png
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PREVIEW = os.path.join(HERE, "preview")
@@ -109,7 +110,7 @@ def main():
     os.makedirs(PREVIEW, exist_ok=True)
     with open(SVG, "w", encoding="utf-8") as f:
         f.write(build())
-    subprocess.run(["rsvg-convert", "-o", PNG, SVG], check=True)
+    svg_to_png(SVG, PNG)
     print("wrote", PNG)
 
 
