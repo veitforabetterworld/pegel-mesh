@@ -17,6 +17,19 @@ def _appimage_candidates() -> list[str]:
     return sorted(glob.glob(os.path.join(BUILD, "*.AppImage")))
 
 
+def windows_bin() -> str | None:
+    """bin-Ordner einer KiCad-Installation unter Windows (Benutzer- oder Systeminstallation, neueste Version)."""
+    if os.name != "nt":
+        return None
+    here = os.path.dirname(sys.executable)
+    if os.path.isfile(os.path.join(here, "kicad-cli.exe")):
+        return here
+    roots = [os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "KiCad"),
+             os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "KiCad")]
+    found = sorted(p for r in roots for p in glob.glob(os.path.join(r, "*", "bin", "kicad-cli.exe")))
+    return os.path.dirname(found[-1]) if found else None
+
+
 def appimage_path() -> str | None:
     c = _appimage_candidates()
     return c[0] if c else None
@@ -41,6 +54,9 @@ def kicad_cli_argv(*args: str) -> list[str]:
     found = shutil.which("kicad-cli")
     if found:
         return [found, *args]
+    win = windows_bin()
+    if win:
+        return [os.path.join(win, "kicad-cli.exe"), *args]
     img = appimage_path()
     if img:
         return [img, "kicad-cli", *args]
@@ -74,6 +90,9 @@ def pcbnew_python() -> str:
         return sys.executable
     except ImportError:
         pass
+    win = windows_bin()
+    if win and os.path.isfile(os.path.join(win, "python.exe")):
+        return os.path.join(win, "python.exe")
     sq = _squashfs_root()
     if sq:
         bindir = os.path.join(sq, "usr", "bin")

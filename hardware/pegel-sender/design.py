@@ -87,8 +87,10 @@ c("C5", "220nF", "CHG_COMC", GND, group=g)
 g = "mppt"
 r("R40", "470k", "VSOL", "VSOL_DIV", group=g)
 r("R41", "68.1k", "VSOL_DIV", GND, group=g)
-r("R42", "97.6k", "VSYS", "MPPT_REF", group=g)
-r("R43", "100k", "MPPT_REF", GND, group=g)
+# Referenz aus +3V3: an VSYS hinge die Schwelle an der Akkuspannung (2,8 V: 11,2 V), ein 12-V-Netzteil
+# gälte bei leerem Akku als Panel und könnte nicht laden. 3,3 V · 1M/1,976M = 1,67 V → 13,2 V an VSOL.
+r("R42", "976k", "+3V3", "MPPT_REF", group=g)
+r("R43", "1M", "MPPT_REF", GND, group=g)
 add("U10", "Comparator:TLV3401", "Package_TO_SOT_SMD:SOT-23-5", "TLV3401", "TI TLV3401IDBVR",
     {"1": "MPPT_EN", "2": GND, "3": "VSOL_DIV", "4": "MPPT_REF", "5": "VSYS"}, g)
 r("R44", "1M", "MPPT_EN", "VSOL_DIV", group=g)
@@ -109,7 +111,7 @@ r("R47", "330k", "MPPT_PULL", "MPPT", group=g)
 add("C6", "Device:C_Polarized", "Capacitor_SMD:CP_Elec_6.3x7.7", "100uF 10V", "Panasonic EEE-FK1A101P", {"1": "VSYS", "2": GND}, g)
 c("C7", "10uF", "VSYS", GND, C1206, "CAP 10uF 16V X7R 1206", g)
 add("D4", "Device:LED", "LED_SMD:LED_0805_2012Metric", "rot", "LED rot 0805", {"1": "CHG_LED", "2": "CHG_LEDA"}, g)
-r("R7", "4.7k", "CHG_LEDA", "VSOL", R0805, "RES 4.7k 1% 0805", g)
+r("R7", "10k", "CHG_LEDA", "VSOL", R0805, "RES 10k 1% 0805", g)
 
 # ---------------------------------------------------------------- Akku: Messung (INA226) und Schutz (HY2112 + 2× FS8205A)
 g = "battery"
@@ -164,7 +166,9 @@ r("R14", "100k", "SENS_EN", GND, group=g)
 add("Q4", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "AO3401A", "AOS AO3401A",
     {"1": "PSW_G", "2": "V12_RAW", "3": "V12_PROBE"}, g)
 r("R15", "100k", "V12_RAW", "PSW_G", group=g)
-add("Q5", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002", {"1": "SENS_EN", "2": GND, "3": "PSW_G"}, g)
+# Teiler 100k/100k: Vgs ≈ −6,2 V statt −12,3 V (AO3401A: max. ±12 V)
+r("R53", "100k", "PSW_G", "PSW_PD", group=g)
+add("Q5", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002", {"1": "SENS_EN", "2": GND, "3": "PSW_PD"}, g)
 
 # ---------------------------------------------------------------- RS485: SC16IS740 (I²C→UART) + MAX3485
 g = "rs485"
@@ -190,6 +194,7 @@ add("JP1", "Jumper:SolderJumper_2_Open", "Jumper:SolderJumper-2_P1.3mm_Open_Roun
 r("R19", "120", "RS485_TERM", "RS485_B", R0805, "RES 120R 1% 0805", g)
 add("D6", "Diode:SM712_SOT23", "Package_TO_SOT_SMD:SOT-23", "SM712", "Semtech SM712.TCT",
     {"1": "RS485_A", "2": "RS485_B", "3": GND}, g)
+add("D12", "Device:D_TVS", "Diode_SMD:D_SMA", "SMAJ15A", "SMAJ15A", {"1": "V12_PROBE", "2": GND}, "12v")
 add("J3", "Connector:Screw_Terminal_01x04", "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",
     "SONDE V+ V- A B", "Phoenix MKDS 1,5/4-5,08 (1715747)",
     {"1": "V12_PROBE", "2": GND, "3": "RS485_A", "4": "RS485_B"}, g)
@@ -206,14 +211,16 @@ add("J4", "Connector:Conn_01x02_Pin", "Connector_PinHeader_2.54mm:PinHeader_1x02
 r("R21", "470k", "VSYS", "T_REF0", group=g)   # B4250: Ladestopp ~0 °C, Heizung ~+2 °C
 r("R22", "28.7k", "T_REF0", "T_REF2", group=g)
 r("R23", "499k", "T_REF2", GND, group=g)
-# Kanal A: bei Kälte Ausgang hoch, Q10 zieht nur das Lade-Gate auf GND. VSYS bleibt.
+# Kanal A: bei Kälte Ausgang hoch, Q10 zieht den MPPT-Pin auf GND, der CN3795 lädt nicht mehr.
+# Nicht über den Lade-FET des Akkuschutzes: dessen Body-Diode läge dann im Entladepfad, ~0,6 V über
+# den FETs löst beim HY2112 den Entlade-Überstrom (100–200 mV) aus und trennt den Akku.
 add("U8", "Comparator:LM393", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "TLV3402", "TI TLV3402IDR",
     {"1": "CHG_INHIBIT", "2": "T_REF0", "3": "T_NTC", "4": GND, "5": "T_REF2", "6": "T_NTC", "7": "HEAT_OFF", "8": "VSYS"}, g)
 c("C19", "100nF", "VSYS", GND, group=g)
 r("R48", "1M", "CHG_INHIBIT", "VSYS", group=g)
 add("Q10", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002",
-    {"1": "CHG_INHIBIT", "2": GND, "3": "PROT_OC"}, g)
-r("R24", "10M", "PROT_OC", "T_REF0", group=g)   # PROT_OC ist bei Kälte low: Mitkopplung bleibt richtig
+    {"1": "CHG_INHIBIT", "2": GND, "3": "MPPT"}, g)
+r("R24", "4.7M", "CHG_INHIBIT", "T_NTC", group=g)   # Mitkopplung: bei Kälte hebt der Ausgang T_NTC, ~1 K Hysterese
 r("R25", "1M", "HEAT_OFF", "VSYS", group=g)
 r("R26", "10M", "HEAT_OFF", "T_REF2", group=g)
 add("Q6", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002", {"1": "HEAT_OFF", "2": GND, "3": "HEAT_G"}, g)

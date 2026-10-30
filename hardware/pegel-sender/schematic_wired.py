@@ -8,6 +8,7 @@ import heapq
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -52,6 +53,7 @@ def sym_roots() -> list[str]:
         os.path.join(kicad_env.BUILD, "AppDir", "share", "kicad", "symbols"),
         os.path.join(kicad_env.BUILD, "squashfs-root", "usr", "share", "kicad", "symbols"),
         "/usr/share/kicad/symbols",
+        os.path.join(os.path.dirname(kicad_env.windows_bin() or ""), "share", "kicad", "symbols"),
     ):
         if os.path.isdir(base):
             roots.append(base)
@@ -62,6 +64,9 @@ def find_lib_file(lib: str, name: str) -> str | None:
     for root in sym_roots():
         path = os.path.join(root, f"{lib}.kicad_symdir", f"{name}.kicad_sym")
         if os.path.isfile(path):
+            return path
+        path = os.path.join(root, f"{lib}.kicad_sym")   # ältere Installationen: eine Datei je Bibliothek
+        if os.path.isfile(path) and f'(symbol "{name}"' in open(path, encoding="utf-8").read():
             return path
     return None
 
@@ -2114,7 +2119,10 @@ def write_sheet(key, title, parts, outside, lib_text, pin_map, unit_map, boxed) 
     if not svgs:
         raise SystemExit(f"kein SVG für {key}")
     png = os.path.join(PREVIEW, f"schematic-{key}.png")
-    subprocess.run(["rsvg-convert", "-w", "1800", "-o", png, svgs[0]], check=True)
+    if shutil.which("rsvg-convert"):
+        subprocess.run(["rsvg-convert", "-w", "1800", "-o", png, svgs[0]], check=True)
+    else:
+        print("rsvg-convert fehlt: PNG nicht erneuert, SVG in", svg_dir)
     print("wrote", png, f"{page_w:.0f}x{page_h:.0f} mm,", len(parts), "parts", f"{len(errors)} Konflikte")
     return errors
 
