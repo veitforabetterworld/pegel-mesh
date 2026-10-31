@@ -2,6 +2,8 @@
 
   python3 export.py
 Ergebnis in fab/. Voraussetzung: kicad-cli (System oder AppImage in build/kicad-appimage/).
+Gerber, Bohrdaten und CPL beziehen sich alle auf die linke untere Platinenecke (Hilfsursprung), sonst liegen
+die Bauteile in der JLCPCB-Vorschau neben der Platine.
 BOM und CPL enthalten nur die SMD-Teile mit LCSC-Nummer (Basic/Preferred). Die Durchsteckteile zum Selbstlöten
 stehen in fab/pegel-sender-handbestueckung.csv.
 """
@@ -27,7 +29,7 @@ def main():
     kicad_env.run_kicad_cli(
         "pcb", "export", "gerbers",
         "--layers", "F.Cu,B.Cu,F.Paste,B.Paste,F.SilkS,B.SilkS,F.Mask,B.Mask,Edge.Cuts",
-        "--subtract-soldermask", "-o", GERBER + os.sep, PCB,
+        "--subtract-soldermask", "--use-drill-file-origin", "-o", GERBER + os.sep, PCB,
     )
     kicad_env.run_kicad_cli(
         "pcb", "export", "drill", "--format", "excellon", "--excellon-separate-th", "--generate-map",
