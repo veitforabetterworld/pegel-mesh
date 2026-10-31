@@ -9,7 +9,7 @@ Bilder: [`preview/`](preview/) — Blockschaltplan (`pegel-sender-schematic-bloc
 | Block | Bauteile | Funktion |
 |---|---|---|
 | Eingang | J1, D1 SMBJ28A, D2 SS54, C1–C4 | Solar oder Netzteil, Überspannung, Verpolung, kein Rückstrom ins Panel |
-| Lader | U1 TPS5430, L1 15 µH, D3, Q1 AO3401A | Abwärtswandler, Konstantspannung 3,50 V über VSENSE (R1/R2); Q1 trennt nachts den Akku vom Wandler |
+| Lader | U1 TPS5430, L1 15 µH, D3, Q1 AO3401A | Abwärtswandler, Konstantspannung 3,50 V über VSENSE (R1/R2); C22 (220 µF mit ESR, wie im TI-Referenzdesign) hält den Regelkreis auch ohne Akku stabil, C23 puffert das Panel; Q1 trennt nachts den Akku vom Wandler |
 | Regelung | U2 LM324, U3 HT7550 (5 V), U4 CJ431 (2,5 V) | A: Ladestrom 2,0 A (100 mV an R15‖R16 im Minuspol), B: Panel-Arbeitspunkt 17 V bzw. 9,7 V mit JP2, C: Frost-Ladesperre, D: Heizung. A–C ziehen den Lader über D4/D5 und R3 an VSENSE zurück. Läuft nur, wenn VSOL anliegt |
 | Frost | NTC an J4, R17–R22, Q3, Q4 HL2310A | Ladesperre unter ~1,2 °C (frei über ~2,7 °C), Heizung unter ~3,8 °C (aus über ~5,2 °C), Heizung nur aus VSOL |
 | Sonde 12 V | U5 TPS61040, L2 10 µH, Q5/Q6 | 12,46 V, nur bei SENS_EN (D0); Q5 trennt die Sonde, solange der Wandler aus ist |

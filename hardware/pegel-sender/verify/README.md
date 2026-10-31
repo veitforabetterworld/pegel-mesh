@@ -25,7 +25,7 @@ py -3.12 -X utf8 sweeps.py
 
 ## Modell
 
-Die Netzliste entsteht direkt aus `design.py`. Passive Bauteile, Dioden und MOSFETs sind echte SPICE-Modelle; die ICs sind Verhaltensmodelle mit den Datenblattwerten: TPS5430 gemittelt mit PI-Regler auf VSENSE (Einschaltschwelle 5,3 V, Tastgrad max. 87 %, Strombegrenzung 4 A), LM324 mit Verstärkung 1e4 und 1 MHz Verstärkungs-Bandbreite, Ausgang bis VCC − 1,5 V, HT7550, CJ431, TPS61040 im Lückbetrieb (Spitzenstrom 0,4 A, 10 µH, max. 1 MHz), SP3485 mit Treiber und Empfänger. Schaltbelastung von U1, D3, L1, C1–C3, L2, D7 analytisch aus Tastgrad und Rippel. Umgebung: Panel (Isc 1,2 A, Voc 22 V bei 25 °C, kalt höher) oder Netzteil an J1, LiFePO4 18 Ah mit OCV-Kennlinie, NTC 10 kΩ B3950 und Heizwiderstand 68 Ω an J4, XIAO-Last, Sonde 30 mA bei 12 V.
+Die Netzliste entsteht direkt aus `design.py`. Passive Bauteile, Dioden und MOSFETs sind echte SPICE-Modelle; die ICs sind Verhaltensmodelle mit den Datenblattwerten: TPS5430 gemittelt im Spannungsmodus mit der internen Typ-III-Kompensation aus dem Datenblatt (Gl. 15: Integrator 2165 Hz, Nullstellen 2,17/2,59 kHz, Pole 24/54 kHz, Vorwärtsverstärkung 25; Einschaltschwelle 5,3 V, Tastgrad max. 87 %, Strombegrenzung 4 A, Überspannungsschutz 112,5 %), LM324 mit Verstärkung 1e4, 1 MHz Verstärkungs-Bandbreite und 0,4 V/µs Anstiegsrate, Ausgang bis VCC − 1,5 V, HT7550, CJ431, TPS61040 im Lückbetrieb (Spitzenstrom 0,4 A, 10 µH, max. 1 MHz), SP3485 mit Treiber und Empfänger. Schaltbelastung von U1, D3, L1, C1–C3, L2, D7 analytisch aus Tastgrad und Rippel. Umgebung: Panel (Isc 1,2 A, Voc 22 V bei 25 °C, kalt höher) oder Netzteil an J1, LiFePO4 18 Ah mit OCV-Kennlinie, NTC 10 kΩ B3950 und Heizwiderstand 68 Ω an J4, XIAO-Last, Sonde 30 mA bei 12 V.
 
 ## Ergebnis
 
@@ -56,6 +56,8 @@ Bei der Auslegung gefundene und behobene Fehler:
 2. Ein 120-Ω-Abschluss am RS485 drückte den Ruhepegel aus R32/R33 auf ~20 mV, die automatische Richtungsumschaltung hätte die „1“-Bits verloren. Abschluss gestrichen (bei 9600 Baud nicht nötig).
 3. Der SP3485 an VSYS hob den RX-Pin des XIAO bis 0,3 V über dessen Versorgung (D10 dazwischen). Abhilfe: SP3485 über Q7 aus XIAO_3V3.
 4. Platine: Schaltknoten und Masse von Shunt und Freilaufdiode hingen an zu schmalen Bahnen. Abhilfe: feste Masse-Vias an R15, R16, D3 (`GND_TIES` in `route.py`). Alle 18 Pfade jetzt über IPC-2221.
+5. Mit dem echten Typ-III-Modell des TPS5430 (vorher PI-Regler) zeigte sich: mit nur Keramik am Ausgang hat sein Regelkreis ohne Akku ~10° Phasenreserve (mit Akku ~36°), und die Panelregelung pendelte bei 5–10 % Licht zwischen ~16 und 22 V. Abhilfe: C22 220 µF mit 20–100 mΩ ESR am Laderausgang wie im TI-Referenzdesign (Phasenreserve ~45–50° ohne, ~63° mit Akku) und C23 220 µF am Panel (Panelregelung bei 10 % Licht ruhig; bei 5 % lädt sie stoßweise, ohne Schaden). Das Kompensationsnetz aus dem TI-Beispiel für reine Keramik macht den Wandler zu langsam für die Panelregelung, die dann schon am 5-W-Panel schwingt; deshalb nicht verwendet.
+6. R7 2,2 kΩ → 1 kΩ: der CJ431 braucht bis 1 mA (Datenblatt max.), vorher blieben im ungünstigsten Fall 0,87 mA.
 
 Langzeit (quasistatisch, 20-min-Schritte, Start bei 30 %, Details in `report/longterm.md`):
 
@@ -67,4 +69,4 @@ Langzeit (quasistatisch, 20-min-Schritte, Start bei 30 %, Details in `report/lon
 
 Ohne Sonne reicht ein voller Akku (18 Ah) etwa 65 Tage. Das Modell erwärmt den Akku nicht durch die Heizung (NTC sieht die Lufttemperatur); in echt gibt die Ladesperre an sonnigen Wintertagen früher frei.
 
-Grenzen der Simulation: Verhaltensmodelle bilden keine Regelschleifen-Stabilität der Wandler im Schaltbetrieb, keine EMV und keine Bauteiltoleranzen ab. Die Stabilität der LM324-Regelkreise mit dem echten TPS5430-Fehlerverstärker ist nur gemittelt geprüft; beim ersten Aufbau Ladestrom und Panelspannung bei schwachem Licht mit dem Oszilloskop ansehen.
+Grenzen der Simulation: gemittelte Modelle bilden keine Effekte im Schaltbetrieb (lückender Betrieb nur grob), keine EMV und keine Bauteiltoleranzen ab. Die Regelkreise sind mit der Datenblatt-Kompensation des TPS5430 gemittelt geprüft; beim ersten Aufbau Ladestrom und Panelspannung bei schwachem Licht mit dem Oszilloskop ansehen.

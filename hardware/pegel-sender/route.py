@@ -964,6 +964,22 @@ def keepouts(board):
         for x, y in ((x1, y1), (x2, y1), (x2, y2), (x1, y2)):
             o.Append(pt(x, y))
         board.Add(z)
+    # Randstreifen ohne Bahnen und Vias: Freerouting kennt den Randabstand (0,5 mm) sonst nicht.
+    k = 0.55
+    for x1, y1, x2, y2 in ((0, 0, W, k), (0, H - k, W, H), (0, 0, k, H), (W - k, 0, W, H)):
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        z.SetDoNotAllowTracks(True)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        o = z.Outline()
+        o.NewOutline()
+        for x, y in ((x1, y1), (x2, y1), (x2, y2), (x1, y2)):
+            o.Append(pt(x, y))
+        board.Add(z)
 
 
 def route_board(board, jar, java):

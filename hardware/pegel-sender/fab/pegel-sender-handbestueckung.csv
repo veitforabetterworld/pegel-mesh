@@ -1,6 +1,8 @@
 Designator,Wert,Teil,Footprint
 J1,SOLAR / 12V,"Klemme 2-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
+C23,220uF 50V,"Elko 220 µF 50 V low ESR, D10 mm RM 5 (z. B. Panasonic EEU-FR1H221)",CP_Radial_D10.0mm_P5.00mm
 L1,15uH,"Bourns RLB0914-150KL (15 µH, 2,4 A)",L_Radial_D8.7mm_P5.00mm_Fastron_07HCP
+C22,220uF 16V,"Polymer- oder Low-ESR-Elko 220 µF 16 V, D8 mm RM 3,5 (z. B. Panasonic 16SEPF220M, EEU-FR1C221)",CP_Radial_D8.0mm_P3.50mm
 JP2,NETZTEIL,"Stiftleiste 1x2 2,54 mm + Jumper",PinHeader_1x02_P2.54mm_Vertical
 J2,"AKKU 3,2V","Klemme 2-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
 J4,HEIZ NTC,"Klemme 4-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal"

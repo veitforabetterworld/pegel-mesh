@@ -41,7 +41,7 @@ Der Sender besteht aus der Trägerplatine mit gestecktem XIAO, einem Solarpanel 
 | Akku | LiFePO4, **1 Zelle** (3,2 V), mehrere Zellen parallel; Anzahl siehe Auslegung. Keine Li-Ion-Zellen (4,2 V)! | 32700-Zellen 6 Ah, 2–3 parallel |
 | Sicherung | Kfz-Flachsicherung 5 A im Pluskabel des Akkus (die Platine hat keinen Kurzschlussschutz am Akku) | Mini-Flachsicherungshalter |
 | Pegelsonde | RS485 Modbus RTU, 9600 Baud 8N1, Adresse 1, Pegel in cm im Holding-Register 4; Versorgung 12 V, höchstens 30 mA | Druck-Pegelsonde 4–20 mA/RS485, 12–24 V |
-| Heizwiderstand | 68 Ω, 5 W, am bzw. um den Akku (nur bei Frost nötig) | Hochlastwiderstand 68 Ω 5 W |
+| Heizwiderstand | 68 Ω, **10 W** (bei gesperrtem Laden liegt das Panel allein daran, ~20 V → ~6 W), am bzw. um den Akku (nur bei Frost nötig) | Hochlastwiderstand 68 Ω 10 W |
 | Temperaturfühler | NTC 10 kΩ, B ≈ 3950, mit Leitung, **auf den Akku** kleben | MF52A103J3950 |
 | Gehäuse | IP65, innen ~115 × 90 mm für die Platine, besser gedämmt (z. B. 10–20 mm XPS) | |
 
@@ -81,7 +81,7 @@ Für den Winter: Gehäuse dämmen (halbiert die Heizenergie), Panel eher steil (
 - **Heizung** an unter ~3,8 °C, aus über ~5,2 °C, nur bei Sonne oder Netzteil — nie aus dem Akku.
 - **Sonde** ist nur während der Messung eingeschaltet.
 - **Akku fast leer:** unter 2,8 V bleibt die Sonde aus und der Sender meldet Fehlercode 4; ab 3,0 V wieder Pegel. Unter 2,6 V schaltet er Funk und Sonde ab und wartet, bis die Sonne den Akku wieder über 3,0 V geladen hat.
-- **Ohne Akku** läuft der Sender direkt aus Panel oder Netzteil, solange genug Licht da ist.
+- **Ohne Akku** läuft der Sender direkt aus dem Netzteil oder aus dem Panel, solange genug Licht da ist; am Panel geht er abends aus und morgens wieder an. Das schadet der Platine nicht.
 
 ### Platine bestellen
 
@@ -95,6 +95,8 @@ Selbst löten (Liste: `fab/pegel-sender-handbestueckung.csv`):
 | SONDE, HEIZ/NTC | Schraubklemme 4-pol., Raster 5,08 mm | Phoenix MKDS 1,5/4-5,08 |
 | L1 | Spule 15 µH, ≥ 2,4 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0914-150KL |
 | L2 | Spule 10 µH, ≥ 0,5 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0912-100KL |
+| C22 (Laderausgang) | Elko 220 µF 16 V, **Polymer oder Low-ESR** (20–100 mΩ), Ø 8 mm, Raster 3,5 mm, + zum Pad mit „+“ | Panasonic 16SEPF220M oder EEU-FR1C221 |
+| C23 (Panel) | Elko 220 µF 50 V, Low-ESR, Ø 10 mm, Raster 5 mm, + zum Pad mit „+“ | Panasonic EEU-FR1H221 |
 | XIAO | 2× Buchsenleiste 1×7, 2,54 mm | |
 | NETZTEIL | Stiftleiste 1×2, 2,54 mm + Steckbrücke | |
 

@@ -97,6 +97,9 @@ add("D2", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS54", "SS54 (40 V 5 A)", {"1
 c("C1", "10uF 50V", "VSOL", GND, g)
 c("C2", "10uF 50V", "VSOL", GND, g)
 c("C3", "10uF 50V", "VSOL", GND, g)
+# Puffer am Panel: bremst VSOL, damit die Panelregelung bei schwachem Licht nicht pendelt
+add("C23", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D10.0mm_P5.00mm", "220uF 50V",
+    "Elko 220 µF 50 V low ESR, D10 mm RM 5 (z. B. Panasonic EEU-FR1H221)", {"1": "VSOL", "2": GND}, g, hand=True)
 
 # ---------------------------------------------------------------- Lader: TPS5430 als Abwärtswandler, 3,50 V
 # Konstantspannung über VSENSE (1,221 V · (1 + 56k/30k) = 3,50 V). Strombegrenzung, Panel-Arbeitspunkt und
@@ -113,6 +116,11 @@ add("L1", "Device:L", L_RADIAL, "15uH", "Bourns RLB0914-150KL (15 µH, 2,4 A)", 
     hand=True)
 c("C6", "22uF 25V", "CHG_OUT", GND, g)
 c("C7", "22uF 25V", "CHG_OUT", GND, g)
+# Ausgangskondensator mit ESR wie im TI-Referenzdesign (220 µF, 20–100 mΩ): die interne Kompensation braucht
+# dessen ESR-Nullstelle; mit nur Keramik am Ausgang hat der Regelkreis ohne Akku ~10° Phasenreserve, so ~45°.
+add("C22", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", "220uF 16V",
+    "Polymer- oder Low-ESR-Elko 220 µF 16 V, D8 mm RM 3,5 (z. B. Panasonic 16SEPF220M, EEU-FR1C221)",
+    {"1": "CHG_OUT", "2": GND}, g, hand=True)
 r("R1", "56k", "CHG_OUT", "CHG_FB", group=g)
 r("R2", "30k", "CHG_FB", GND, group=g)
 r("R3", "10k", "CHG_LIM", "CHG_FB", group=g)
@@ -140,7 +148,7 @@ add("U2", "Amplifier_Operational:LM324", "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",
     g, lcsc="C71035")
 c("C11", "100nF", "+5V", GND, g)
 add("U4", "pegel:CJ431", SOT23, "CJ431", "JCET CJ431 (2,5 V)", {"1": "VREF", "2": "VREF", "3": GND}, g, lcsc="C3113")
-r("R7", "2.2k", "+5V", "VREF", group=g)
+r("R7", "1k", "+5V", "VREF", group=g)     # CJ431 braucht bis 1 mA, R7 liefert ~2,3 mA
 # A: Integrator, VREF/25 = 100 mV Sollwert gegen den Spannungsabfall am Shunt
 r("R8", "24k", "VREF", "CC_SET", group=g)
 r("R9", "1k", "CC_SET", GND, group=g)

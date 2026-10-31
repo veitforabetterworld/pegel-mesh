@@ -28,7 +28,9 @@ CASES = [
      {"Ichg": (-0.02, 0.02), "Iheat": (0.15, 0.4)}),
     (Scenario("5-W-Panel +10 °C (Arbeitspunkt begrenzt)", sun=1, temp=10, soc=0.3, panel_isc=0.3),
      {"VSOL": (16.5, 18.0), "Ichg": (0.3, 1.8)}),
-    (Scenario("Schwaches Licht 10 % (Arbeitspunkt)", sun=0.1, temp=10, soc=0.3),
+    # 10 % Licht als Panel mit 10 % Kurzschlussstrom und entsprechend niedrigerer Leerlaufspannung
+    # (−36 · n · kT/q · ln 10 ≈ −1,5 … −2,7 V); gleichwertig zu sun=0.1, aber für ngspice gutmütiger
+    (Scenario("Schwaches Licht 10 % (Arbeitspunkt)", sun=1, temp=10, soc=0.3, panel_isc=0.12, panel_voc25=20.5),
      {"VSOL": (16.5, 18.0), "Ichg": (0.05, 1.0)}),
     (Scenario("Panel offen −25 °C, Akku voll", sun=1, temp=-25, soc=1.0),
      {"VSOL": (0, 27)}),

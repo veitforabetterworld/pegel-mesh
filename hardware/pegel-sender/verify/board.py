@@ -151,7 +151,8 @@ def part_lines(p, sc) -> list[str]:
         out.append(f"R{ref} {n['1']} {n['2']} {num(p.value)}")
     elif p.symbol in ("Device:C", "Device:C_Polarized"):
         out.append(f"C{ref} {n['1']} N_{ref}_esr {num(p.value)}")
-        out.append(f"R{ref}_esr N_{ref}_esr {n['2']} 0.005")
+        esr = 0.05 if p.symbol == "Device:C_Polarized" else 0.005   # Elko/Polymer: ESR zwischen 20 und 100 mΩ
+        out.append(f"R{ref}_esr N_{ref}_esr {n['2']} {esr}")
     elif p.symbol == "Device:L":
         from models import RATINGS
         dcr = next((v["DCR"] for k, v in RATINGS.items() if k in p.mpn and "DCR" in v), 0.05)
@@ -194,36 +195,53 @@ def ic_lines(p, n, sc) -> list[str]:
     v = p.value
     if v == "TPS5430":
         vin, fb, sw = n["7"], n["4"], n["8"]
-        # Gemittelt: Ausgangsstrom aus PI-Regler auf VSENSE = 1,221 V (I-Anteil im Knoten _ctl, ohne
-        # bleibende Regelabweichung wie der echte Fehlerverstärker); Einschaltschwelle 5,3 V, Tastgrad max. 87 %,
-        # Strombegrenzung 4 A (Datenblatt min.). Body-Diode des internen Schalters PH → VIN.
+        # Gemittelt, Spannungsmodus wie im Datenblatt (SLVS632 Gl. 15): interne Typ-III-Kompensation
+        # fp0 2165 Hz (Integrator), fz1 2170 Hz, fz2 2590 Hz, fp1 24 kHz, fp2 54 kHz, Vorwärtsverstärkung 25
+        # (Mittelwert am PH = 25 · Vcomp, unabhängig von VIN). Einschaltschwelle 5,3 V, Tastgrad max. 87 %,
+        # Strombegrenzung 4 A (Datenblatt min.). Der Schalter liefert nur Strom (lückender Betrieb sperrt
+        # Rückstrom), Body-Diode des internen Schalters PH → VIN.
+        w = lambda hz: 2 * math.pi * hz
         on = f"min(1,max(0,(V({vin})-5.3)*5))"
-        kd = f"min(1,max(0,(0.87*V({vin})-V({sw}))*5))"
         err = f"(1.221-V({fb}))"
-        ctl = f"N_{ref}_ctl"
-        iout = f"({on}*{kd}*min(4.0, max(0, V({ctl}) + 20*{err})))"
+        x0, lp1, y1, lp2, y2 = (f"N_{ref}_{k}" for k in ("x0", "lp1", "y1", "lp2", "y2"))
+        k1, k2 = 24e3 / 2170, 54e3 / 2590
+        ilim = f"min(1,max(0,(4.0-I(V{ref}_am))*5))"
+        ovp = f"min(1,max(0,(1.221*1.125-V({fb}))*50))"   # Überspannungsschutz: VSENSE > 112,5 % sperrt
+        duty = f"(min(0.87, max(0, 25*V({y2})/max(V({vin}),1)))*{on}*{ilim}*{ovp})"
         return [
-            f"C{ref}_ctl {ctl} 0 1",
-            f"B{ref}_ctl 0 {ctl} I = 2000*{err}",
-            f"V{ref}_hi N_{ref}_hi 0 4.2", f"D{ref}_hi {ctl} N_{ref}_hi BODY",
-            f"D{ref}_lo 0 {ctl} BODY",
-            f"B{ref}_rst {ctl} 0 I = (1-{on})*V({ctl})*10",
-            f"B{ref}_out 0 {sw} I = {iout}",
-            f"B{ref}_in {vin} 0 I = {iout}*max(V({sw}),0)/(max(V({vin}),1)*0.9) + 4.4m*{on} + 20u*min(1,max(0,V({vin})/5))",
+            f"C{ref}_x0 {x0} 0 1",
+            f"B{ref}_x0 0 {x0} I = {w(2165):.1f}*{err}",
+            f"V{ref}_hi N_{ref}_hi 0 1.5", f"D{ref}_hi {x0} N_{ref}_hi IDEAL",
+            f"V{ref}_lo N_{ref}_lo 0 -0.2", f"D{ref}_lo N_{ref}_lo {x0} IDEAL",
+            f"B{ref}_rst {x0} 0 I = (1-{on})*V({x0})*10",
+            # (1 + s/wz)/(1 + s/wp) = k + (1 - k)/(1 + s/wp), k = wp/wz
+            f"C{ref}_lp1 {lp1} 0 {1 / w(24e3):.4e}", f"B{ref}_lp1 0 {lp1} I = V({x0})-V({lp1})",
+            f"B{ref}_y1 {y1} 0 V = {k1:.4f}*V({x0}) + {1 - k1:.4f}*V({lp1})",
+            f"C{ref}_lp2 {lp2} 0 {1 / w(54e3):.4e}", f"B{ref}_lp2 0 {lp2} I = V({y1})-V({lp2})",
+            # Ausgang des Fehlerverstärkers begrenzt (Tastgrad 0 … max.), wie beim echten Verstärker
+            f"B{ref}_y2 {y2} 0 V = min(1.5, max(-0.1, {k2:.4f}*V({y1}) + {1 - k2:.4f}*V({lp2})))",
+            f"B{ref}_sw N_{ref}_swi 0 V = {duty}*V({vin})",
+            f"V{ref}_am N_{ref}_swi N_{ref}_swj 0",
+            f"D{ref}_sw N_{ref}_swj {sw} IDEAL", f"C{ref}_swn {sw} 0 470p",   # Kapazität am Schaltknoten
+            f"B{ref}_in {vin} 0 I = {duty}*max(I(V{ref}_am),0) + 4.4m*{on} + 20u*min(1,max(0,V({vin})/5))",
             f"D{ref}_hs {sw} {vin} BODY",
             f"R{ref}_boot {n['1']} {sw} 1e6",
         ]
     if v == "LM324":
         vcc = n["4"]
         out = [f"B{ref}_q {vcc} 0 I = 0.7m*min(1,max(0,V({vcc})/3))"]
-        # Ausgang 5 mV … VCC − 1,5 V, Verstärkung 1e4 mit Pol bei 100 Hz (Verstärkungs-Bandbreite 1 MHz)
+        # Verstärkung 1e4 mit Pol bei 100 Hz (Verstärkungs-Bandbreite 1 MHz), Anstiegsrate 0,4 V/µs, Ausgang
+        # 5 mV … VCC − 1,5 V. Die Begrenzung sitzt hinter dem Pol: übersteuert läuft der Ausgang mit der
+        # Anstiegsrate an die Grenze und hängt dort nicht nach.
+        out.append(f"B{ref}_hi N_{ref}_hi 0 V = max(V({vcc})-1.5, 0.01)")
+        out.append(f"V{ref}_lo N_{ref}_lo 0 0.005")
         for i, (o, m, pl) in enumerate((("1", "2", "3"), ("7", "6", "5"), ("8", "9", "10"), ("14", "13", "12"))):
+            b = f"N_{ref}_{i}b"
             out += [
-                f"B{ref}_{i} N_{ref}_{i}a 0 V = max(min(1e4*(V({n[pl]})-V({n[m]})), V({vcc})-1.5), 0.005)"
-                f"*min(1,max(0,V({vcc})-2.5))",
-                f"R{ref}_{i}p N_{ref}_{i}a N_{ref}_{i}b 1k",
-                f"C{ref}_{i}p N_{ref}_{i}b 0 1.6u",
-                f"B{ref}_{i}o N_{ref}_{i}c 0 V = V(N_{ref}_{i}b)",
+                f"B{ref}_{i} 0 {b} I = max(-0.64m, min(0.64m, (1e4*(V({n[pl]})-V({n[m]})) - V({b}))/1Meg))",
+                f"C{ref}_{i}p {b} 0 1.6n",
+                f"D{ref}_{i}h {b} N_{ref}_hi IDEAL", f"D{ref}_{i}l N_{ref}_lo {b} IDEAL",
+                f"B{ref}_{i}o N_{ref}_{i}c 0 V = V({b})",
                 f"R{ref}_{i}o N_{ref}_{i}c {n[o]} 50",
             ]
         return out
@@ -273,7 +291,12 @@ def settle(ng, sc: Scenario, t_end=0.4, extra_lines=()) -> dict[str, float]:
     try:
         res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98}", ramp="10m", extra_lines=list(extra_lines)))
     except RuntimeError:
-        # Ersatzweg bei Konvergenzproblemen: Trapez-Verfahren, gröbere Toleranz
-        res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98}", ramp="10m",
-                             extra_lines=list(extra_lines) + [".options method=trap reltol=2e-3 abstol=1e-9"]))
+        # Ersatzweg bei Konvergenzproblemen: Trapez-Verfahren, gröbere Toleranz, langsamer hochfahren
+        try:
+            res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98}", ramp="10m",
+                                 extra_lines=list(extra_lines) + [".options method=trap reltol=2e-3 abstol=1e-9"]))
+        except RuntimeError:
+            res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98} 2u", ramp="50m",
+                                 extra_lines=list(extra_lines) + [".options method=trap reltol=3e-3 abstol=1e-8 "
+                                                                  "vntol=1e-5 gmin=1e-10"]))
     return {k: v[-1] for k, v in res.items()}
