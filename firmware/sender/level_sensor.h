@@ -2,9 +2,11 @@
 // Pegelsonde über RS485 / Modbus RTU (wie water-level-sensor.ino): Funktion 3, ein Holding-Register,
 // Wert in cm.
 //
-// PEGEL_BOARD=1, Trägerplatine pegel-sender v1 (hardware/pegel-sender):
-//   D6/D7 I²C -> SC16IS740 (UART, steuert DE/RE selbst) -> MAX3485 -> Sonde A/B
-//   D0        -> 12-V-Versorgung der Sonde (HIGH = an), vor der Messung PEGEL_SENSOR_WARMUP_MS Vorlauf
+// PEGEL_BOARD=1, Trägerplatine pegel-sender (hardware/pegel-sender):
+//   D6 (TX, Serial1)  -> SP3485, Richtung automatisch (TX low schaltet den Treiber ein)
+//   D7 (RX, Serial1)  <- RO des SP3485
+//   D0                -> 12-V-Versorgung der Sonde und des SP3485 (HIGH = an),
+//                        vor der Messung PEGEL_SENSOR_WARMUP_MS Vorlauf
 // PEGEL_BOARD=0, fliegender Aufbau mit RS485-Modul (Sonde dauerhaft versorgt):
 //   D6 (TX, Serial1)  -> DI des RS485-Wandlers
 //   D7 (RX, Serial1)  <- RO des RS485-Wandlers
@@ -28,7 +30,7 @@
 #define LEVEL_OK              0
 #define LEVEL_NO_RESPONSE     1   // keine oder fehlerhafte Antwort (Zeitüberschreitung, CRC)
 #define LEVEL_OUT_OF_RANGE    2   // Wert außerhalb des Messbereichs
-#define LEVEL_NO_INTERFACE    3   // RS485-Wandler (SC16IS740) antwortet nicht
+#define LEVEL_NO_INTERFACE    3   // RS485-Wandler antwortet nicht (nur ältere Platine mit SC16IS740)
 #define LEVEL_BATTERY_LOW     4   // Akku fast leer (Sender, Trägerplatine; Schwelle in battery.h)
 
 void level_sensor_begin();

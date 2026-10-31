@@ -290,6 +290,44 @@
       },
       {
         "bus_width": 12,
+        "clearance": 0.25,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.3_C0.25",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.3,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.3,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.3_C0.3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.3,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
         "clearance": 0.2,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
@@ -297,7 +335,7 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Power",
+        "name": "W0.4_C0.2",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": -1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
@@ -316,14 +354,71 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Power1A",
+        "name": "W0.5_C0.2",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.25,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.5_C0.25",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.25,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.6_C0.25",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": -1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.6,
         "tuning_profile": "",
-        "via_diameter": 0.8,
-        "via_drill": 0.4,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.3,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.6_C0.3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.6,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
         "wire_width": 6
       },
       {
@@ -335,11 +430,87 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Power3A",
+        "name": "W0.8_C0.2",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.8,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.3,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W0.8_C0.3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.8,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.25,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W1.2_C0.25",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": -1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 1.2,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.25,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W2_C0.25",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 2.0,
+        "tuning_profile": "",
+        "via_diameter": 1.2,
+        "via_drill": 0.6,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.3,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "W2_C0.3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": -1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 2.0,
         "tuning_profile": "",
         "via_diameter": 1.2,
         "via_drill": 0.6,
@@ -353,64 +524,172 @@
     "netclass_assignments": null,
     "netclass_patterns": [
       {
-        "netclass": "Power3A",
-        "pattern": "HEAT_N"
+        "netclass": "W0.3_C0.25",
+        "pattern": "BST_FB"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "SOLAR_F"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CC_INT"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "BAT_P"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CC_OUT"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "DC_F"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CC_SENSE"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "DC_RAW"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CC_SET"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "SOLAR_RAW"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CHG_FB"
       },
       {
-        "netclass": "Power3A",
-        "pattern": "CHG_SW"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CHG_INH"
       },
       {
-        "netclass": "Power1A",
-        "pattern": "VSOL"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CHG_LIM"
       },
       {
-        "netclass": "Power1A",
-        "pattern": "CHG_CSP"
+        "netclass": "W0.3_C0.25",
+        "pattern": "CHG_PG"
       },
       {
-        "netclass": "Power1A",
-        "pattern": "BST_SW"
+        "netclass": "W0.3_C0.25",
+        "pattern": "HEAT_OFF"
       },
       {
-        "netclass": "Power",
+        "netclass": "W0.3_C0.25",
+        "pattern": "PSW_G"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "PSW_PD"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "RS485_A"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "RS485_B"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "RS_DE"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "SENS_EN"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "T_NTC"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "T_REF0"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "T_REF2"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "UART_RX"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "UART_TX"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "VIN_DIV"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "VIN_OUT"
+      },
+      {
+        "netclass": "W0.3_C0.25",
+        "pattern": "VREF"
+      },
+      {
+        "netclass": "W0.3_C0.3",
+        "pattern": "CHG_BOOT"
+      },
+      {
+        "netclass": "W0.3_C0.3",
+        "pattern": "CHG_PGD"
+      },
+      {
+        "netclass": "W0.3_C0.3",
+        "pattern": "HEAT_G"
+      },
+      {
+        "netclass": "W0.3_C0.3",
+        "pattern": "VIN_J"
+      },
+      {
+        "netclass": "W0.4_C0.2",
+        "pattern": "GND"
+      },
+      {
+        "netclass": "W0.5_C0.2",
+        "pattern": "+5V"
+      },
+      {
+        "netclass": "W0.5_C0.25",
+        "pattern": "RS_VCC"
+      },
+      {
+        "netclass": "W0.6_C0.25",
+        "pattern": "XIAO_3V3"
+      },
+      {
+        "netclass": "W0.6_C0.3",
         "pattern": "V12_PROBE"
       },
       {
-        "netclass": "Power",
+        "netclass": "W0.6_C0.3",
         "pattern": "V12_RAW"
       },
       {
-        "netclass": "Power",
+        "netclass": "W0.8_C0.2",
+        "pattern": "VSOL"
+      },
+      {
+        "netclass": "W0.8_C0.3",
+        "pattern": "BST_SW"
+      },
+      {
+        "netclass": "W0.8_C0.3",
+        "pattern": "HEAT_N"
+      },
+      {
+        "netclass": "W0.8_C0.3",
+        "pattern": "IN_RAW"
+      },
+      {
+        "netclass": "W1.2_C0.25",
+        "pattern": "VSYS"
+      },
+      {
+        "netclass": "W2_C0.25",
         "pattern": "BAT_N"
       },
       {
-        "netclass": "Power",
-        "pattern": "HEAT_PU"
+        "netclass": "W2_C0.25",
+        "pattern": "CHG_OUT"
       },
       {
-        "netclass": "Power",
-        "pattern": "PROT_D"
+        "netclass": "W2_C0.3",
+        "pattern": "CHG_SW"
       }
     ]
   },

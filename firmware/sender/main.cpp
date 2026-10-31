@@ -90,18 +90,31 @@ class SenderMesh : public mesh::Mesh {
   bool sensor_on = false;
   bool battery_low = false;
   uint16_t bat_mv = 0;
-  int16_t bat_ma = 0;
 
 #if PEGEL_BOARD
-  // true, solange der Akku als fast leer gilt. INA226 stumm: letzten Zustand behalten.
+  // true, solange der Akku als fast leer gilt. Unplausible Messung: letzten Zustand behalten.
   bool refreshBattery() {
-    if (!battery_read(bat_mv, bat_ma)) {
-      logf("battery: INA226 not responding\n");
+    if (!battery_read(bat_mv)) {
+      logf("battery: VDD reading implausible\n");
       return battery_low;
     }
-    logf("battery %u mV %d mA\n", bat_mv, bat_ma);
+    logf("battery %u mV\n", bat_mv);
+    if (battery_cutoff(bat_mv)) hibernate();
     battery_low = battery_low_update(battery_low, bat_mv);
     return battery_low;
+  }
+
+  // Tiefentladeschutz: Sonde und Funk aus, halbstündlich nachmessen. Lädt die Sonne den Akku wieder über
+  // PEGEL_BATTERY_OK_MV, startet der Sender neu und initialisiert den Funk sauber.
+  void hibernate() {
+    logf("battery %u mV below %u mV: radio off, sleeping\n", bat_mv, PEGEL_BATTERY_CUTOFF_MV);
+    level_sensor_power(false);
+    radio_driver.powerOff();
+    while (true) {
+      delay(30UL * 60 * 1000);
+      uint16_t mv;
+      if (battery_read(mv) && mv >= PEGEL_BATTERY_OK_MV) NVIC_SystemReset();
+    }
   }
 #endif
 
@@ -290,9 +303,6 @@ void setup() {
   InternalFS.begin();
 #if PEGEL_SENSOR
   level_sensor_begin();
-#endif
-#if PEGEL_BOARD
-  if (!battery_begin()) logf("battery: INA226 not found\n");
 #endif
   the_mesh.begin();
 }

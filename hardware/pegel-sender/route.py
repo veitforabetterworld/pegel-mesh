@@ -29,15 +29,8 @@ SES = os.path.join(HERE, "build", "pegel-sender.ses")
 ORIGIN = (50.0, 50.0)
 W, H = 100.0, 70.0
 
-# 3-A-Pfade als Kupferflächen auf F.Cu: Netz -> Rechteck (x1, y1, x2, y2) in Platinenkoordinaten, Priorität.
-POWER_ZONES = [
-    ("VSOL", (17, 1.5, 33, 16), 3),
-    ("DC_F", (14, 26, 22, 44), 3),
-    ("CHG_SW", (33, 1.5, 44.5, 20), 4),
-    ("CHG_CSP", (43.5, 8.5, 56.5, 21.0), 4),   # L1.2 (53,5/10) bis R1.1 (45/21)
-    ("VSYS", (43, 19.8, 66, 32), 3),
-    ("BAT_N", (4.5, 46, 19.2, 62), 3),         # J2.2 bis zu den S1-Pins; S2 (GND) bleibt frei für die GND-Fläche
-]
+# Kupferflächen für Hochstrompfade auf F.Cu: Netz -> Rechteck (x1, y1, x2, y2) in Platinenkoordinaten, Priorität.
+POWER_ZONES = []   # die 2-A-Pfade tragen 2 mm breite Bahnen (gen_pcb.NET_WIDTH)
 
 
 def mm(v):
@@ -777,83 +770,99 @@ def drop_redundant_gnd(board):
     return removed
 
 
-def _leg_clear(board, x1, y1, x2, y2, net, layer, width):
-    gap = width / 2 + 0.2
-    if not segment_clear(board, x1, y1, x2, y2, net, gap, layer):
-        return False
-    if layer != pcbnew.B_Cu or net == "GND":
-        return True
-    steps = max(1, int(math.hypot(x2 - x1, y2 - y1) / 0.2))
-    for i in range(steps + 1):
-        u = i / steps
-        if _in_bcu_gnd_fill(board, x1 + (x2 - x1) * u, y1 + (y2 - y1) * u):
+def chamfer_corners(board, gap=0.3):
+    """Rechte Winkel zwischen zwei Bahnen desselben Netzes durch eine 45°-Schräge ersetzen, wo der Abstand reicht."""
+    tracks = []
+    for t in board.GetTracks():
+        t.thisown = 0
+        if t.GetClass() == "PCB_TRACK" and not t.IsLocked():
+            tracks.append(t)
+    obstacles = []   # (Netz, Lage oder None für beide, Art, Geometrie, halbe Breite)
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            l, t_ = to_board(pcbnew.VECTOR2I(pad.GetBoundingBox().GetLeft(), pad.GetBoundingBox().GetTop()))
+            r, b = to_board(pcbnew.VECTOR2I(pad.GetBoundingBox().GetRight(), pad.GetBoundingBox().GetBottom()))
+            layer = None if pad.HasHole() else pcbnew.F_Cu if pad.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu
+            obstacles.append((pad.GetNetname(), layer, "box", (l, t_, r, b), 0.0))
+    for t in board.GetTracks():
+        t.thisown = 0
+        if t.GetClass() == "PCB_VIA":
+            x, y = to_board(t.GetPosition())
+            obstacles.append((t.GetNetname(), None, "seg", (x, y, x, y), pcbnew.ToMM(t.GetWidth(pcbnew.F_Cu)) / 2))
+    seg_of = {}
+    for t in tracks:
+        x1, y1 = to_board(t.GetStart())
+        x2, y2 = to_board(t.GetEnd())
+        seg_of[id(t)] = len(obstacles)
+        obstacles.append((t.GetNetname(), t.GetLayer(), "seg", (x1, y1, x2, y2), pcbnew.ToMM(t.GetWidth()) / 2))
+
+    def clear(x1, y1, x2, y2, net, layer, half):
+        if min(x1, x2) < 0.6 or min(y1, y2) < 0.6 or max(x1, x2) > W - 0.6 or max(y1, y2) > H - 0.6:
             return False
-    return True
-
-
-def orthogonalize_diagonals(board):
-    """Ersetzt eine schräge Bahn durch einen rechten Winkel, wenn beide Schenkel frei bleiben."""
-    changed = 0
-    pending = list(board.GetTracks())
-    for tr in pending:
-        tr.thisown = 0
-    for tr in pending:
-        if tr.GetClass() != "PCB_TRACK":
-            continue
-        x1, y1 = to_board(tr.GetStart())
-        x2, y2 = to_board(tr.GetEnd())
-        if not _is_diagonal(x1, y1, x2, y2, 2.0):
-            continue
-        if _has_mid_junction(board, tr):
-            continue
-        net = tr.GetNetname()
-        layer = tr.GetLayer()
-        width = pcbnew.ToMM(tr.GetWidth())
-        elbows = (
-            (x2, y1),
-            (x1, y2),
-        )
-        placed = False
-        for mx, my in elbows:
-            if math.hypot(mx - x1, my - y1) < 0.2 or math.hypot(x2 - mx, y2 - my) < 0.2:
+        steps = max(2, int(math.hypot(x2 - x1, y2 - y1) / 0.1))
+        pts = [(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps) for i in range(steps + 1)]
+        for onet, olayer, kind, g, ohalf in obstacles:
+            if onet == net or (olayer is not None and olayer != layer):
                 continue
-            if _leg_clear(board, x1, y1, mx, my, net, layer, width) and _leg_clear(board, mx, my, x2, y2, net, layer, width):
-                board.Delete(tr)
-                add_track(board, x1, y1, mx, my, net, layer, width)
-                add_track(board, mx, my, x2, y2, net, layer, width)
-                changed += 1
-                placed = True
+            lim = half + ohalf + gap
+            if kind == "box":
+                l, t_, r, b = g
+                if max(l - x1, l - x2) > lim or max(x1 - r, x2 - r) > lim or max(t_ - y1, t_ - y2) > lim                         or max(y1 - b, y2 - b) > lim:
+                    continue
+                if any(math.hypot(px - min(max(px, l), r), py - min(max(py, t_), b)) < lim for px, py in pts):
+                    return False
+            else:
+                if any(dist_point_seg(px, py, *g) < lim for px, py in pts):
+                    return False
+        return True
+
+    ends = {}
+    for t in tracks:
+        for which, vec in (("s", t.GetStart()), ("e", t.GetEnd())):
+            x, y = to_board(vec)
+            ends.setdefault((round(x, 3), round(y, 3), t.GetLayer()), []).append((t, which))
+    vias = {(round(o[3][0], 3), round(o[3][1], 3)) for o in obstacles if o[2] == "seg" and o[1] is None}
+    done = 0
+    for (cx, cy, layer), group in ends.items():
+        if len(group) != 2 or (cx, cy) in vias:
+            continue
+        (ta, wa), (tb, wb) = group
+        net = ta.GetNetname()
+        if tb.GetNetname() != net or ta.GetWidth() != tb.GetWidth() or ta is tb:
+            continue
+        if on_same_net_pad(board, cx, cy, net):
+            continue
+        far = []
+        for t, which in group:
+            x, y = to_board(t.GetEnd() if which == "s" else t.GetStart())
+            far.append((x, y))
+        (ax, ay), (bx, by) = far
+        la, lb = math.hypot(ax - cx, ay - cy), math.hypot(bx - cx, by - cy)
+        if la < 0.3 or lb < 0.3:
+            continue
+        ua = ((ax - cx) / la, (ay - cy) / la)
+        ub = ((bx - cx) / lb, (by - cy) / lb)
+        if abs(ua[0] * ub[0] + ua[1] * ub[1]) > 0.05:
+            continue
+        width = pcbnew.ToMM(ta.GetWidth())
+        for d in (max(1.0, 2 * width), max(0.6, width), 0.4):
+            d = min(d, 0.45 * la, 0.45 * lb)
+            p1 = (cx + ua[0] * d, cy + ua[1] * d)
+            p2 = (cx + ub[0] * d, cy + ub[1] * d)
+            if clear(*p1, *p2, net, layer, width / 2):
                 break
-        if not placed:
+        else:
             continue
-    return changed
-
-
-def reroute_remaining_diagonals(board):
-    """Schräge Bahn ohne Abzweig, die kein rechter Winkel freilässt, orthogonal neu legen."""
-    moved = 0
-    for tr in list(board.GetTracks()):
-        tr.thisown = 0
-        if tr.GetClass() != "PCB_TRACK" or tr.GetLayer() != pcbnew.F_Cu:
-            continue
-        x1, y1 = to_board(tr.GetStart())
-        x2, y2 = to_board(tr.GetEnd())
-        if not _is_diagonal(x1, y1, x2, y2, 3.0) or _has_mid_junction(board, tr):
-            continue
-        net = tr.GetNetname()
-        if route_points(board, x1, y1, x2, y2, net, pcbnew.ToMM(tr.GetWidth())):
-            board.Delete(tr)
-            moved += 1
-            print(f"reroute {net} ({x1:.1f},{y1:.1f})->({x2:.1f},{y2:.1f})")
-    return moved
-
-
-def cleanup_copper(board):
-    """Schräge Bahnen ohne Abzweig in einen rechten Winkel legen. GND-Bahnen nicht löschen: das öffnet Netze."""
-    squared = orthogonalize_diagonals(board)
-    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    print(f"copper cleanup: squared {squared}")
-    return squared
+        for t, which, p in ((ta, wa, p1), (tb, wb, p2)):
+            (t.SetStart if which == "s" else t.SetEnd)(pt(*p))
+            k = seg_of[id(t)]
+            o = obstacles[k]
+            far_pt = (o[3][2], o[3][3]) if which == "s" else (o[3][0], o[3][1])
+            obstacles[k] = (o[0], o[1], "seg", (*p, *far_pt), o[4])
+        add_track(board, *p1, *p2, net, layer, width)
+        obstacles.append((net, layer, "seg", (*p1, *p2), width / 2))
+        done += 1
+    return done
 
 
 def electrical_errors(report: dict) -> list[str]:
@@ -863,7 +872,7 @@ def electrical_errors(report: dict) -> list[str]:
         bad.append("open: " + " <-> ".join(parts))
     for v in report.get("violations") or []:
         desc = v.get("description", "")
-        if desc.startswith("Items shorting") or desc.startswith("Tracks crossing"):
+        if desc.startswith(("Items shorting", "Tracks crossing", "Clearance violation")):
             parts = [i.get("description", "") for i in v.get("items", [])]
             bad.append(desc + " | " + " <-> ".join(parts))
     return bad
@@ -879,20 +888,39 @@ def silk_errors(report: dict) -> list[str]:
     return bad
 
 
-# Hochstrompfade, die Freerouting sonst mit Signalbahnen durch die Flächen zerschneidet: vorab als
-# feste Bahnen gelegt (Netz, Breite, Punkte, Via am Ende mit Bohrung)
-PREROUTE = [
-    ("CHG_CSP", 1.2, [(53.55, 10.0), (53.55, 21.0), (50.96, 21.0)], None),     # L1.2 → R1.1, 3 A
-    ("VSYS", 1.2, [(45.04, 21.0), (45.04, 29.0)], None),                         # R1.2 → R8.1, 3 A
-    ("GND", 1.0, [(38.42, 15.4), (40.3, 15.4)], 0.6),                            # D3 Anode → GND-Fläche, 3 A
-    ("GND", 1.0, [(38.42, 16.6), (40.3, 16.6)], 0.6),
-    ("GND", 0.4, [(21.86, 49.7), (21.86, 50.36)], None),                         # Q2 S2-Pins
-    ("GND", 0.4, [(21.86, 56.7), (21.86, 57.36)], None),                         # Q3 S2-Pins
-    # Q3 auf der Oberseite zu Q2 und gemeinsam über eine Via zur GND-Fläche (unten unter Q3 nur eine Insel);
-    # 0,6 mm Abstand zu den Pads lässt PROT_OC von Q2 durch
-    ("GND", 0.5, [(21.86, 57.03), (24.0, 57.03), (24.0, 50.03)], None),
-    ("GND", 0.5, [(21.86, 50.03), (24.0, 50.03)], 0.4),                          # 3 A gesamt
+# Hochstrompfade, die Freerouting sonst zu schmal anbindet: vorab als feste Bahnen gelegt
+# (Netz, Breite, Punkte, Via am Ende mit Bohrung)
+PREROUTE = []
+
+# Masse-Pads mit hohem Strom: kurze 1,2-mm-Bahn vom Pad zu je einer Via (Bohrung 0,6 mm) in die GND-Fläche.
+# (Ref, Pad, [Versatz der Vias zum Padmittelpunkt in mm])
+GND_TIES = [
+    ("R15", "2", [(0.0, 2.0)]),
+    ("R16", "2", [(0.0, 2.0)]),
+    ("D3", "2", [(-1.1, 2.2), (1.1, 2.2)]),
 ]
+
+
+def gnd_ties(board):
+    fps = {fp.GetReference(): fp for fp in board.GetFootprints()}
+    for ref, num, offsets in GND_TIES:
+        x, y = to_board(fps[ref].FindPadByNumber(num).GetPosition())
+        for dx, dy in offsets:
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(pt(x, y))
+            t.SetEnd(pt(x + dx, y + dy))
+            t.SetWidth(mm(1.2))
+            t.SetLayer(pcbnew.F_Cu)
+            t.SetNet(board.FindNet("GND"))
+            t.SetLocked(True)
+            board.Add(t)
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pt(x + dx, y + dy))
+            v.SetWidth(mm(1.0))
+            v.SetDrill(mm(0.6))
+            v.SetNet(board.FindNet("GND"))
+            v.SetLocked(True)
+            board.Add(v)
 
 
 def preroute(board):
@@ -917,9 +945,8 @@ def preroute(board):
             board.Add(v)
 
 
-# Unterseite ohne Bahnen (Vias erlaubt), damit die GND-Fläche dort zusammenhängt: Rückstrom der Schutz-FETs.
-# Der Streifen bis zum Rand verhindert, dass Signalbahnen die Insel unter Q2/Q3 ringsum einschließen.
-KEEPOUT_B = [(22.6, 48.6, 25.0, 58.4), (22.6, 58.4, 25.0, 69.5)]
+# Unterseite ohne Bahnen (Vias erlaubt), damit die GND-Fläche dort zusammenhängt (x1, y1, x2, y2).
+KEEPOUT_B = []
 
 
 def keepouts(board):
@@ -945,6 +972,7 @@ def route_board(board, jar, java):
     for z in list(board.Zones()):
         board.Remove(z)
     preroute(board)
+    gnd_ties(board)
     keepouts(board)
     # GND nicht vorher als Fläche: sonst lässt Freerouting die Masse-Pins offen, sobald die Fläche zerrissen ist.
     if not pcbnew.ExportSpecctraDSN(board, DSN):
@@ -1008,9 +1036,7 @@ def main():
             print("DRC unconnected:", " <-> ".join(parts))
         if repair_opens(board, unconn) == 0:
             break
-    squared = orthogonalize_diagonals(board)
-    moved = reroute_remaining_diagonals(board)
-    print(f"squared {squared} diagonals, rerouted {moved}")
+    print(f"chamfered {chamfer_corners(board)} right-angle corners to 45°")
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     import gen_pcb
     gen_pcb.layout_silk(board)

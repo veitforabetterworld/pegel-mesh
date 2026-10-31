@@ -1,7 +1,9 @@
-"""Fertigungsdaten für PCBWay: Gerber + Bohrdaten (ZIP), Bestückungsliste (BOM) und Bestückungsdatei (CPL).
+"""Fertigungsdaten für JLCPCB: Gerber + Bohrdaten (ZIP), Stückliste (BOM) und Bestückungsdatei (CPL).
 
   python3 export.py
 Ergebnis in fab/. Voraussetzung: kicad-cli (System oder AppImage in build/kicad-appimage/).
+BOM und CPL enthalten nur die SMD-Teile mit LCSC-Nummer (Basic/Preferred). Die Durchsteckteile zum Selbstlöten
+stehen in fab/pegel-sender-handbestueckung.csv.
 """
 
 import csv
@@ -35,6 +37,7 @@ def main():
         for f in sorted(os.listdir(GERBER)):
             z.write(os.path.join(GERBER, f), f)
 
+    assembled = {p.ref for p in design.PARTS if p.lcsc and not p.hand and not p.dnp}
     pos = os.path.join(FAB, "pos-raw.csv")
     kicad_env.run_kicad_cli(
         "pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "both",
@@ -45,20 +48,28 @@ def main():
         w = csv.writer(out)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         for row in csv.DictReader(f):
+            if row["Ref"] not in assembled:
+                continue
             w.writerow([row["Ref"], f'{float(row["PosX"]):.3f}mm', f'{float(row["PosY"]):.3f}mm',
                         "Top" if row["Side"] == "top" else "Bottom", row["Rot"]])
     os.remove(pos)
 
     groups: "OrderedDict[tuple, list]" = OrderedDict()
     for p in design.PARTS:
-        if p.dnp or not p.mpn:
-            continue
-        groups.setdefault((p.value, p.mpn, p.footprint.split(":")[1]), []).append(p.ref)
+        if p.ref in assembled:
+            groups.setdefault((p.value, p.footprint.split(":")[1], p.lcsc), []).append(p.ref)
     with open(os.path.join(FAB, "pegel-sender-bom.csv"), "w", newline="", encoding="utf-8") as out:
         w = csv.writer(out)
-        w.writerow(["Item", "Designator", "Qty", "Value", "Manufacturer Part Number", "Package"])
-        for i, ((value, mpn, pkg), refs) in enumerate(groups.items(), 1):
-            w.writerow([i, ",".join(refs), len(refs), value, mpn, pkg])
+        w.writerow(["Comment", "Designator", "Footprint", "LCSC Part #"])
+        for (value, pkg, lcsc), refs in groups.items():
+            w.writerow([value, ",".join(refs), pkg, lcsc])
+
+    with open(os.path.join(FAB, "pegel-sender-handbestueckung.csv"), "w", newline="", encoding="utf-8") as out:
+        w = csv.writer(out)
+        w.writerow(["Designator", "Wert", "Teil", "Footprint"])
+        for p in design.PARTS:
+            if p.hand:
+                w.writerow([p.ref, p.value, p.mpn, p.footprint.split(":")[1]])
     print("fab data in", FAB)
 
 

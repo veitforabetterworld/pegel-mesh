@@ -1,0 +1,10 @@
+Designator,Wert,Teil,Footprint
+J1,SOLAR / 12V,"Klemme 2-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
+L1,15uH,"Bourns RLB0914-150KL (15 µH, 2,4 A)",L_Radial_D8.7mm_P5.00mm_Fastron_07HCP
+JP2,NETZTEIL,"Stiftleiste 1x2 2,54 mm + Jumper",PinHeader_1x02_P2.54mm_Vertical
+J2,"AKKU 3,2V","Klemme 2-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
+J4,HEIZ NTC,"Klemme 4-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal"
+L2,10uH,"Bourns RLB0912-100KL (10 µH, 2,5 A)",L_Radial_D8.7mm_P5.00mm_Fastron_07HCP
+J3,SONDE V+ V- A B,"Klemme 4-pol. 5,08 mm","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal"
+J5,XIAO D0-D6,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical
+J6,XIAO 5V-D7,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical

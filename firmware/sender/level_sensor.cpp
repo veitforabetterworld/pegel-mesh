@@ -4,10 +4,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#if PEGEL_BOARD
-  #include "sc16is740.h"
-#endif
-
 #ifndef PEGEL_SENSOR_PIN
   #define PEGEL_SENSOR_PIN  D0   // Trägerplatine: Sondenversorgung, fliegender Aufbau: DE/RE
 #endif
@@ -40,35 +36,32 @@ static uint16_t crc16(const uint8_t* data, int len) {
   return crc;
 }
 
-// RS485-Übertragung: über den SC16IS740 der Trägerplatine oder über Serial1 mit DE an D0.
-#if PEGEL_BOARD
+// RS485 über Serial1 (TX D6, RX D7, 8N1). MeshCore legt I2C auf D6/D7 (RTC-Suche in radio_init); danach
+// gehören die Pins der UART. Trägerplatine: der SP3485 schaltet die Richtung selbst (TX low → Treiber an) und
+// ist nur mit der Sonde versorgt, die UART läuft deshalb nur, solange die Sonde an ist. Fliegender Aufbau:
+// DE/RE an D0, Sonde dauerhaft versorgt.
 static bool busBegin() {
-  bool ok = sc16is740::begin(PEGEL_MODBUS_BAUD);
-  if (ok) sc16is740::sleep();
-  return ok;
-}
-static void busFlushRx() { sc16is740::flushRx(); }
-static void busSend(const uint8_t* data, int len) { sc16is740::write(data, len); }
-static int busRead() { return sc16is740::read(); }
-#else
-static bool busBegin() {
-  // MeshCore legt I2C auf D6/D7 (RTC-Suche in radio_init); ohne Trägerplatine gehören die Pins der UART.
   Wire.end();
+#if !PEGEL_BOARD
   digitalWrite(PEGEL_SENSOR_PIN, LOW);
-  Serial1.begin(PEGEL_MODBUS_BAUD);   // 8N1, TX D6, RX D7
+  Serial1.begin(PEGEL_MODBUS_BAUD);
+#endif
   return true;
 }
 static void busFlushRx() {
   while (Serial1.available()) Serial1.read();
 }
 static void busSend(const uint8_t* data, int len) {
+#if !PEGEL_BOARD
   digitalWrite(PEGEL_SENSOR_PIN, HIGH);
+#endif
   Serial1.write(data, len);
   Serial1.flush();
+#if !PEGEL_BOARD
   digitalWrite(PEGEL_SENSOR_PIN, LOW);
+#endif
 }
 static int busRead() { return Serial1.available() ? Serial1.read() : -1; }
-#endif
 
 void level_sensor_begin() {
   pinMode(PEGEL_SENSOR_PIN, OUTPUT);
@@ -79,6 +72,9 @@ void level_sensor_begin() {
 void level_sensor_power(bool on) {
 #if PEGEL_BOARD
   digitalWrite(PEGEL_SENSOR_PIN, on ? HIGH : LOW);
+  // UART nur bei versorgtem SP3485: sonst speisten TX/RX ihn über seine Schutzdioden
+  if (on) Serial1.begin(PEGEL_MODBUS_BAUD);
+  else Serial1.end();
 #endif
 }
 
@@ -120,8 +116,5 @@ static uint8_t measure(uint16_t& level_mm) {
 uint8_t level_sensor_read_mm(uint16_t& level_mm) {
   uint8_t status = measure(level_mm);
   level_sensor_power(false);
-#if PEGEL_BOARD
-  if (bus_ok) sc16is740::sleep();
-#endif
   return status;
 }

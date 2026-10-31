@@ -6,7 +6,7 @@ Aufruf: python3 schematic.py [block ...]   (schreibt preview/schematic-<block>.p
   Masse unten), wie fixed_positions.py für die Platine.
 - Leitungen verlegt ein Router rechtwinklig im 1,27-mm-Raster: kurze Wege, wenig Knicke, nie durch
   Bauteile oder Texte, Kreuzungen nur gerade und teuer.
-- Versorgung (+3V3, VSYS, VSOL, XIAO_3V3) und GND als Symbol; Labels nur für Netze, die das Blatt
+- Versorgung (+5V, VSYS, VSOL, XIAO_3V3) und GND als Symbol; Labels nur für Netze, die das Blatt
   verlassen.
 - Jedes Blatt wird über die KiCad-Netzliste gegen design.py geprüft.
 """
@@ -30,7 +30,7 @@ SCH_DIR = os.path.join(PREVIEW, "schematic")
 G = 2.54          # Layout-Einheit in schematic_layout.py
 STEP = 1.27       # Routing-Raster
 GND = "GND"
-SUPPLY = {"+3V3": "power:+3V3", "VSYS": "power:VCC", "VSOL": "power:VCC", "XIAO_3V3": "power:VCC"}
+SUPPLY = {"+5V": "power:+5V", "VSYS": "power:VCC", "VSOL": "power:VCC", "XIAO_3V3": "power:VCC"}
 POWER_NETS = set(SUPPLY) | {GND}
 CHAR = 1.05
 DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}

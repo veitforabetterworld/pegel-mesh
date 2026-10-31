@@ -1,4 +1,4 @@
-"""SPICE-Netzliste der ganzen Platine aus design.py, plus Umgebung (Panel, Netzteil, Akku, XIAO, Sonde).
+"""SPICE-Netzliste der ganzen Platine aus design.py, plus Umgebung (Panel/Netzteil, Akku, NTC, Heizung, XIAO, Sonde).
 
 Jede Strommessung läuft über eine 0-V-Quelle "VAM_<Ref>[_<Zweig>]" in Reihe, damit Dioden-, MOSFET- und
 Spulenströme direkt als Vektor vorliegen. ICs sind Verhaltensmodelle (gemittelt, keine Schaltflanken).
@@ -15,8 +15,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import design  # noqa: E402
 from models import DIODE_MODEL, MOS_MODEL, SPICE_MODELS  # noqa: E402
 
-ICC = 0.120 / 0.040            # CN3795: 120 mV über R1 (40 mΩ)
-VREG = 1.205 * (1 + 200 / 100)  # Ladeschlussspannung
+R_SHUNT = 0.1 / 2                # R15 ‖ R16 im Minuspol des Akkus
 OCV = [(0.0, 2.50), (0.02, 2.90), (0.05, 3.10), (0.10, 3.20), (0.20, 3.25), (0.40, 3.29), (0.60, 3.31),
        (0.80, 3.33), (0.90, 3.34), (0.97, 3.40), (1.0, 3.60)]
 CAPACITY_AS = 18.0 * 3600       # 3 × 6 Ah (32700) parallel
@@ -30,7 +29,7 @@ def node(net: str) -> str:
 
 
 def num(value: str) -> float:
-    """'4.7k', '100nF 50V', '40m 2W', '10M' → Zahl (M = Mega wie in KiCad, m = milli)."""
+    """'4.7k', '100nF 50V', '0.1', '10M' → Zahl (M = Mega wie in KiCad, m = milli)."""
     v = value.split()[0]
     m = re.match(r"^([\d.]+)\s*([pnuµmkMG]?)", v)
     base = float(m.group(1))
@@ -39,18 +38,21 @@ def num(value: str) -> float:
 
 @dataclass
 class Scenario:
-    """Umgebung. sun 0..1 (Bestrahlung), temp °C (Platine, Panel), dc: Netzteilspannung oder None."""
+    """Umgebung. sun 0..1 (Bestrahlung), temp °C (Akku/NTC, Panel), dc: Netzteilspannung an J1 oder None."""
     name: str = "default"
     sun: float = 0.0
     temp: float = 20.0
     dc: float | None = None
+    jp2: bool = False               # Steckbrücke "NETZTEIL" gesetzt
     soc: float = 0.5
-    v_cell: float | None = None    # Zellspannung erzwingen statt SoC-Kennlinie
+    v_cell: float | None = None     # Zellspannung erzwingen statt SoC-Kennlinie
+    battery: bool = True
+    ntc: bool = True                # NTC an J4
+    heater_ohm: float = 68.0        # Heizwiderstand an J4
     xiao_ma: float = 6.0            # MeshCore: Empfang dauernd an
     sens: bool = False              # SENS_EN (Sonde an)
-    probe_ma: float = 50.0
-    transmit: bool = False          # RS485 sendet (RTS high)
-    jp1: bool = False               # 120-Ω-Abschluss
+    probe_ma: float = 30.0
+    transmit: bool = False          # UART_TX low: RS485-Treiber sendet "0"
     panel_isc: float = 1.2          # 20-W-Panel (Isc), Voc 22 V bei 25 °C
     panel_voc25: float = 22.0
     extra: list = field(default_factory=list)
@@ -83,52 +85,56 @@ def netlist(sc: Scenario, analysis: str, battery_dynamic=False, temp_expr=None, 
     if ramp:
         sun = f"({sun})*min(1,time/{ramp})"
     L.append(f"Bpv 0 N_PV I = ({sun})*{sc.panel_isc} - {i0:.4e}*(exp(V(N_PV)/{vta:.4f})-1)")
-    L.append("Rpv_s N_PV N_SOLAR_RAW 0.3")
+    L.append("Rpv_s N_PV N_IN_RAW 0.3")
     L.append("Rpv_p N_PV 0 1e6")
     if sc.dc is not None:
         dc = f"{sc.dc}" if not isinstance(sc.dc, str) else sc.dc
         if ramp:
             dc = f"({dc})*min(1,time/{ramp})"
         L.append(f"Bdc N_DCSRC 0 V = {dc}")
-        L.append("Rdc N_DCSRC N_DC_RAW 0.1")
-    else:
-        L.append("Rdc_open N_DC_RAW 0 1e7")
+        L.append("Ddc N_DCSRC N_IN_RAW BODY")
 
-    # Akku: OCV(SoC) + Innenwiderstand, Strom über VAM_BAT (positiv = Laden)
-    if sc.v_cell is not None:
-        v = sc.v_cell if not isinstance(sc.v_cell, str) else sc.v_cell
-        L.append(f"Bcell N_CELL N_BAT_N V = {v}")
-    else:
-        if battery_dynamic:
-            L.append(f"Csoc N_SOC 0 {CAPACITY_AS} IC={sc.soc}")
-            L.append("Bsoc 0 N_SOC I = I(VAM_BAT)")
-            L.append("Rsoc N_SOC 0 1e12")
-            L.append(f".ic V(N_SOC)={sc.soc}")
+    # Akku an J2: OCV(SoC) + Innenwiderstand, Strom über VAM_BAT (positiv = Laden)
+    if sc.battery:
+        if sc.v_cell is not None:
+            L.append(f"Bcell N_CELL N_BAT_N V = {sc.v_cell}")
         else:
-            L.append(f"Vsoc N_SOC 0 {sc.soc}")
-        L.append(f"Bcell N_CELL N_BAT_N V = pwl(V(N_SOC), {ocv_pwl()})")
-    L.append(f"Rbat N_CELL N_BATI {R_BAT}")
-    L.append("VAM_BAT N_BAT_P N_BATI 0")
+            if battery_dynamic:
+                L.append(f"Csoc N_SOC 0 {CAPACITY_AS} IC={sc.soc}")
+                L.append("Bsoc 0 N_SOC I = I(VAM_BAT)")
+                L.append("Rsoc N_SOC 0 1e12")
+                L.append(f".ic V(N_SOC)={sc.soc}")
+            else:
+                L.append(f"Vsoc N_SOC 0 {sc.soc}")
+            L.append(f"Bcell N_CELL N_BAT_N V = pwl(V(N_SOC), {ocv_pwl()})")
+        L.append(f"Rbat N_CELL N_BATI {R_BAT}")
+        L.append("VAM_BAT N_VSYS N_BATI 0")
 
-    # XIAO + Funk an XIAO_3V3, SENS_EN vom XIAO-Pin, I²C ruhend
+    # NTC 10k B3950 und Heizwiderstand am Akku (J4)
+    if sc.ntc:
+        L.append("Bntc N_T_NTC 0 I = V(N_T_NTC)/(10k*exp(3950*(1/(V(N_TEMP)+273.15)-1/298.15)))")
+    L.append(f"Rheat N_VSOL N_HEATA {sc.heater_ohm}")
+    L.append("VAM_HEAT N_HEATA N_HEAT_N 0")
+
+    # XIAO + Funk an XIAO_3V3, SENS_EN und UART_TX vom XIAO
     rf = f"*min(1,time/{ramp})" if ramp else ""
     L.append(f"Bxiao N_XIAO_3V3 0 I = {sc.xiao_ma / 1000}{rf}*min(1,max(0,V(N_XIAO_3V3)-1.5))")
-    L.append(f"Bsens N_SENSDRV 0 V = {3.3 if sc.sens else 0}{rf.replace(ramp or 'x', '20m') if ramp else ''}")
+    L.append(f"Bsens N_SENSDRV 0 V = {'V(N_XIAO_3V3)' if sc.sens else 0}")
     L.append("Rsens N_SENSDRV N_SENS_EN 100")
-    L.append("Rscl N_I2C_SCL 0 1e7")
-    L.append("Rsda N_I2C_SDA 0 1e7")
+    L.append(f"Btx N_TXDRV 0 V = {0 if sc.transmit else 'V(N_XIAO_3V3)'}")
+    L.append("Rtx N_TXDRV N_UART_TX 100")
     # Sonde an J3: Last ab ~8 V, eigener RS485-Empfänger 12 kΩ
     L.append(f"Bprobe N_V12_PROBE 0 I = {sc.probe_ma / 1000}*min(1, max(0, (V(N_V12_PROBE)-8)/2))")
     L.append("Rprobe_a N_RS485_A N_PROBE_MID 12k")
     L.append("Rprobe_b N_RS485_B N_PROBE_MID 12k")
     L.append("Bprobe_mid N_PROBE_MID 0 V = min(V(N_V12_PROBE), 5)/2")
     L.append("Rprobe_idle N_V12_PROBE 0 100k")
-    L.append("Rntc_ext N_NTC_SEL3 0 1e7")
     L += list(sc.extra) + list(extra_lines)
     # Hochohmig gegen GND: keine schwebenden Knoten (z. B. Schaltknoten der gemittelten Wandler)
-    nodes = sorted({tok for ln in L for tok in re.findall(r"N_[A-Za-z0-9_]+", ln)})
+    nodes = sorted({tok for ln in L for tok in re.findall(r"N_[A-Za-z0-9_]+", ln)})
     L += [f"Rleak_{i} {nd} 0 1e10" for i, nd in enumerate(nodes)]
-    L.append(".options gmin=1e-12 reltol=1e-4 abstol=1e-10 vntol=1e-6 itl1=500 itl4=200")
+    # Gear und reltol 1e-3: die schnellen Regelkreise (Panel-Arbeitspunkt, Wandler) machen die Netzliste steif
+    L.append(".options gmin=1e-12 reltol=1e-3 abstol=1e-9 vntol=1e-6 itl1=500 itl4=200 method=gear")
     if save:
         L.append(".save " + " ".join(f"i({x[2:]})" if x.startswith("i:") else f"v({x})" for x in save))
     L.append(analysis)
@@ -144,28 +150,27 @@ def part_lines(p, sc) -> list[str]:
     if p.symbol == "Device:R":
         out.append(f"R{ref} {n['1']} {n['2']} {num(p.value)}")
     elif p.symbol in ("Device:C", "Device:C_Polarized"):
-        esr = 0.3 if "Polarized" in p.symbol else 0.005
         out.append(f"C{ref} {n['1']} N_{ref}_esr {num(p.value)}")
-        out.append(f"R{ref}_esr N_{ref}_esr {n['2']} {esr}")
+        out.append(f"R{ref}_esr N_{ref}_esr {n['2']} 0.005")
     elif p.symbol == "Device:L":
         from models import RATINGS
         dcr = next((v["DCR"] for k, v in RATINGS.items() if k in p.mpn and "DCR" in v), 0.05)
         out.append(f"VAM_{ref} {n['1']} N_{ref}_a 0")
         out.append(f"L{ref} N_{ref}_a N_{ref}_b {num(p.value)}")
         out.append(f"R{ref}_dcr N_{ref}_b {n['2']} {dcr}")
-    elif p.symbol == "Device:Fuse":
-        out.append(f"VAM_{ref} {n['1']} N_{ref}_a 0")
-        out.append(f"R{ref} N_{ref}_a {n['2']} 0.04")
-    elif kind in ("D_Schottky", "D_Zener", "D_TVS", "LED"):
+    elif kind in ("D_Schottky", "D_Zener", "D_TVS", "D"):
         model = DIODE_MODEL[p.value]
         out.append(f"VAM_{ref} {n['2']} N_{ref}_a 0")       # Pin 2 = Anode
         out.append(f"D{ref} N_{ref}_a {n['1']} {model}")
+    elif kind == "BAV70":
+        for pad in ("1", "2"):
+            out.append(f"D{ref}_{pad} {n[pad]} {n['3']} {DIODE_MODEL['BAV70']}")
     elif kind == "SM712_SOT23":
         for pad in ("1", "2"):
             out.append(f"D{ref}_{pad}p N_{ref}_{pad}m {n[pad]} TVS13")
             out.append(f"D{ref}_{pad}n N_{ref}_{pad}m {n['3']} TVS7")
     elif kind in ("Q_NMOS", "Q_PMOS"):
-        g, s, d = (n["1"], n["3"], n["2"]) if "TO-252" in p.footprint else (n["1"], n["2"], n["3"])
+        g, s, d = n["1"], n["2"], n["3"]
         model = MOS_MODEL[p.value]
         out.append(f"VAM_{ref} {d} N_{ref}_d 0")
         out.append(f"M{ref} N_{ref}_d {g} {s} {s} {model}")
@@ -173,23 +178,10 @@ def part_lines(p, sc) -> list[str]:
             out.append(f"D{ref}_body {s} N_{ref}_d BODY")
         else:
             out.append(f"D{ref}_body N_{ref}_d {s} BODY")
-    elif kind == "FS8205A":
-        # Zwei N-FETs mit gemeinsamem Drain: FET1 S1/G1, FET2 S2/G2
-        dnode = n["1"]
-        out.append(f"VAM_{ref}_1 {n['2']} N_{ref}_s1 0")
-        out.append(f"M{ref}_1 {dnode} {n['4']} N_{ref}_s1 N_{ref}_s1 NFS8205")
-        out.append(f"D{ref}_1body N_{ref}_s1 {dnode} BODY")
-        out.append(f"VAM_{ref}_2 {n['6']} N_{ref}_s2 0")
-        out.append(f"M{ref}_2 {dnode} {n['5']} N_{ref}_s2 N_{ref}_s2 NFS8205")
-        out.append(f"D{ref}_2body N_{ref}_s2 {dnode} BODY")
-    elif kind == "Thermistor_NTC":
-        out.append(f"B{ref} {n['1']} {n['2']} I = V({n['1']},{n['2']})/(100k*exp(4250*(1/(V(N_TEMP)+273.15)-1/298.15)))")
-    elif kind == "SolderJumper_3_Bridged12":
-        out.append(f"R{ref} {n['1']} {n['2']} 0.01")
-    elif kind == "SolderJumper_2_Open":
-        out.append(f"R{ref} {n['1']} {n['2']} {0.01 if sc.jp1 else 1e9}")
-    elif kind.startswith(("Screw_Terminal", "Conn_", "Crystal")):
-        pass   # Umgebung bzw. ohne Gleichstromwirkung
+    elif ref == "JP2":
+        out.append(f"R{ref} {n['1']} {n['2']} {0.01 if sc.jp2 else 1e9}")
+    elif kind.startswith(("Screw_Terminal", "Conn_")):
+        pass   # Umgebung
     elif p.ref.startswith("U"):
         out += ic_lines(p, n, sc)
     else:
@@ -200,106 +192,88 @@ def part_lines(p, sc) -> list[str]:
 def ic_lines(p, n, sc) -> list[str]:
     ref = p.ref
     v = p.value
-    if v == "CN3795":
-        vcc, bat, csp, fb, mppt = n["9"], n["7"], n["8"], n["6"], n["4"]
-        on = f"min(1,max(0,(V({vcc})-6.6)*2))*min(1,max(0,(V({vcc})-V({bat})-0.3)*10))"
-        pre = f"(V({bat}) < {0.665 * VREG:.3f} ? 0.175 : 1)"
-        kcv = f"min(1,max(0,(1.205-V({fb}))*200))"
-        kmp = f"min(1,max(0,(V({mppt})-1.205)*40))"
-        iout = f"({ICC:.3f}*{pre}*{on}*{kcv}*{kmp})"
+    if v == "TPS5430":
+        vin, fb, sw = n["7"], n["4"], n["8"]
+        # Gemittelt: Ausgangsstrom aus PI-Regler auf VSENSE = 1,221 V (I-Anteil im Knoten _ctl, ohne
+        # bleibende Regelabweichung wie der echte Fehlerverstärker); Einschaltschwelle 5,3 V, Tastgrad max. 87 %,
+        # Strombegrenzung 4 A (Datenblatt min.). Body-Diode des internen Schalters PH → VIN.
+        on = f"min(1,max(0,(V({vin})-5.3)*5))"
+        kd = f"min(1,max(0,(0.87*V({vin})-V({sw}))*5))"
+        err = f"(1.221-V({fb}))"
+        ctl = f"N_{ref}_ctl"
+        iout = f"({on}*{kd}*min(4.0, max(0, V({ctl}) + 20*{err})))"
         return [
-            f"B{ref}_out 0 {csp} I = {iout}",
-            f"B{ref}_in {vcc} 0 I = {iout}*V({csp})/(max(V({vcc}),1)*0.92) + 1m*{on}",
-            f"B{ref}_bat {bat} 0 I = 15u",
-            f"R{ref}_drv {n['10']} {vcc} 10",       # gemittelt: Gate aus, Schaltbelastung in stress.py
-            f"B{ref}_vg {n['1']} 0 V = max(V({vcc})-7, 0)",
-            f"B{ref}_chrg {n['3']} 0 I = ({iout} > {0.16 * ICC:.3f} ? 1 : 0)*min(V({n['3']})/100, 12m)",
-            f"R{ref}_com {n['5']} 0 1e7",
+            f"C{ref}_ctl {ctl} 0 1",
+            f"B{ref}_ctl 0 {ctl} I = 2000*{err}",
+            f"V{ref}_hi N_{ref}_hi 0 4.2", f"D{ref}_hi {ctl} N_{ref}_hi BODY",
+            f"D{ref}_lo 0 {ctl} BODY",
+            f"B{ref}_rst {ctl} 0 I = (1-{on})*V({ctl})*10",
+            f"B{ref}_out 0 {sw} I = {iout}",
+            f"B{ref}_in {vin} 0 I = {iout}*max(V({sw}),0)/(max(V({vin}),1)*0.9) + 4.4m*{on} + 20u*min(1,max(0,V({vin})/5))",
+            f"D{ref}_hs {sw} {vin} BODY",
+            f"R{ref}_boot {n['1']} {sw} 1e6",
         ]
-    if v == "HY2112-CB":
-        vdd, vss, od, oc, cs = n["5"], n["6"], n["1"], n["3"], n["2"]
-        # OD (Entlade-FET) an: Zelle > 2,3 V (aus < 2,1 V); Entlade-Überstrom 200 mV (HY2112-CB).
-        # OC (Lade-FET) an: Zelle < 3,60 V (aus > 3,75 V); Lade-Überstrom −200 mV.
-        return [
-            f"B{ref}_cell N_{ref}_c 0 V = V({vdd},{vss})",
-            f"B{ref}_celln N_{ref}_cn 0 V = -V({vdd},{vss})",
-            f"B{ref}_ocur N_{ref}_oi 0 V = 0.20 - V({cs},{vss})",
-            f"B{ref}_ccur N_{ref}_ci 0 V = V({cs},{vss}) + 0.20",
-            f"S{ref}_odv {vdd} N_{ref}_odi N_{ref}_c 0 SWHY_OD",
-            f"R{ref}_odi N_{ref}_odi {od} 1k",   # Überstrom: getrennte Funktionsprüfung (Verzögerung, Latch)
-            f"R{ref}_odpd {od} {vss} 1e6",
-            f"S{ref}_ocv {vdd} N_{ref}_oci N_{ref}_cn 0 SWHY_OC",
-            f"R{ref}_oci N_{ref}_oci {oc} 1k",
-            f"R{ref}_ocpd {oc} {vss} 1e6",
-            f"I{ref}_q {vdd} {vss} 4u",
-            ".model SWHY_OD SW(VT=2.2 VH=0.1 RON=1k ROFF=1e10)",
-            ".model SWHY_OC SW(VT=-3.675 VH=0.075 RON=1k ROFF=1e10)",
-        ]
-    if v == "TPS63900":
-        vin, vout = n["10"], n["6"]
-        return [
-            f"B{ref}_reg N_{ref}_r 0 V = 3.3*min(1,max(0,(V({vin})-1.7)*10))",
-            f"VAM_{ref}_out N_{ref}_r N_{ref}_o 0",
-            f"R{ref}_o N_{ref}_o {vout} 0.05",
-            f"B{ref}_in {vin} 0 I = I(VAM_{ref}_out)*3.3/(max(V({vin}),1.5)*0.9) + 75n",
-            f"R{ref}_cfg1 {n['3']} 0 1e9",
-        ]
-    if v == "LM2735":
-        vin, en, fb = n["5"], n["4"], n["3"]
-        out = "N_V12_RAW"
-        # CCM-Boost, Schalterstrom begrenzt (min. 1,6 A): Imax = (Ilim − ΔI/2)·(1−D), D = 1 − Vin·η/Vout,
-        # ΔI = Vin·D/(L·f) mit 4,7 µH, 1,6 MHz.
-        d = f"max(0.05, 1 - V({vin})*0.85/max(V({out}),V({vin})+0.5))"
-        imax = f"max(0, (1.6 - V({vin})*{d}/(4.7u*1.6meg)/2)*(1-{d}))"
-        enb = f"min(1,max(0,(V({en})-1.0)*5))"
-        iout = f"({enb}*min({imax}, max(0,(1.255-V({fb}))*20)))"
-        return [
-            f"B{ref}_out 0 {out} I = {iout}",
-            f"B{ref}_in {vin} 0 I = {iout}*V({out})/(max(V({vin}),1)*0.85) + 3m*{enb}",
-            f"R{ref}_en {en} 0 1e8",
-        ]
-    if v in ("TLV3401", "TLV3402"):
-        units = [("3", "4", "1")] if v == "TLV3401" else [("3", "2", "1"), ("5", "6", "7")]
-        vcc = n["5"] if v == "TLV3401" else n["8"]
-        out = [f"I{ref}_q {vcc} 0 {0.47e-6 * len(units)}"]
-        for i, (ip, im, o) in enumerate(units):
-            # Open-Drain: zieht nach GND, wenn IN+ < IN−; ohne Versorgung hochohmig
-            low = f"0.5*(1+tanh((V({n[im]})-V({n[ip]}))*2000))*min(1,max(0,(V({vcc})-1.5)*5))"
-            out.append(f"B{ref}_{i} {n[o]} 0 I = {low}*V({n[o]})/50")
+    if v == "LM324":
+        vcc = n["4"]
+        out = [f"B{ref}_q {vcc} 0 I = 0.7m*min(1,max(0,V({vcc})/3))"]
+        # Ausgang 5 mV … VCC − 1,5 V, Verstärkung 1e4 mit Pol bei 100 Hz (Verstärkungs-Bandbreite 1 MHz)
+        for i, (o, m, pl) in enumerate((("1", "2", "3"), ("7", "6", "5"), ("8", "9", "10"), ("14", "13", "12"))):
+            out += [
+                f"B{ref}_{i} N_{ref}_{i}a 0 V = max(min(1e4*(V({n[pl]})-V({n[m]})), V({vcc})-1.5), 0.005)"
+                f"*min(1,max(0,V({vcc})-2.5))",
+                f"R{ref}_{i}p N_{ref}_{i}a N_{ref}_{i}b 1k",
+                f"C{ref}_{i}p N_{ref}_{i}b 0 1.6u",
+                f"B{ref}_{i}o N_{ref}_{i}c 0 V = V(N_{ref}_{i}b)",
+                f"R{ref}_{i}o N_{ref}_{i}c {n[o]} 50",
+            ]
         return out
-    if v == "INA226":
-        return [f"I{ref}_vs {n['6']} 0 330u", f"I{ref}_inp {n['10']} 0 10u", f"I{ref}_inm {n['9']} 0 10u",
-                f"R{ref}_vbus {n['8']} 0 830k"]
-    if v == "SC16IS740":
-        return [f"I{ref}_vdd {n['1']} 0 1m",
-                f"V{ref}_tx N_{ref}_tx 0 3.3", f"R{ref}_tx N_{ref}_tx {n['12']} 50",
-                f"V{ref}_rts N_{ref}_rts 0 {3.3 if sc.transmit else 0}", f"R{ref}_rts N_{ref}_rts {n['10']} 50",
-                f"R{ref}_rx {n['13']} 0 1e8", f"R{ref}_rst {n['14']} 0 1e8",
-                f"R{ref}_x1 {n['15']} 0 1e8", f"R{ref}_x2 {n['16']} 0 1e8"]
-    if v == "MAX3485":
-        vcc, a, b = n["8"], n["6"], n["7"]
-        lines = [f"I{ref}_vcc {vcc} 0 1.1m",
-                 f"R{ref}_ra {a} N_{ref}_mid 12k", f"R{ref}_rb {b} N_{ref}_mid 12k",
-                 f"B{ref}_mid N_{ref}_mid 0 V = V({vcc})/2",
-                 f"B{ref}_ro N_{ref}_ro 0 V = (V({a},{b}) > 0.2 ? V({vcc}) : 0)",
-                 f"R{ref}_ro N_{ref}_ro {n['1']} {1e7 if sc.transmit else 50}"]
-        if sc.transmit:   # Treiber: DI (TX) high → A high, B low
-            lines += [f"B{ref}_da N_{ref}_da 0 V = V({vcc})", f"R{ref}_da N_{ref}_da {a} 20",
-                      f"B{ref}_db N_{ref}_db 0 V = 0", f"R{ref}_db N_{ref}_db {b} 20"]
-        return lines
-    if v == "LM66100":
-        vin, vout = n["1"], n["6"]
-        return [f"VAM_{ref} {vin} N_{ref}_i 0",
-                f"B{ref} N_{ref}_i {vout} I = max(V(N_{ref}_i,{vout}),0)/0.08"]
+    if v == "HT7550-1":
+        vin, vout = n["2"], n["3"]
+        return [f"B{ref}_r N_{ref}_r 0 V = min(5.0, max(V({vin})-0.1, 0))",
+                f"VAM_{ref}_o N_{ref}_r N_{ref}_o 0",
+                f"R{ref}_o N_{ref}_o {vout} 0.5",
+                f"B{ref}_in {vin} 0 I = max(I(VAM_{ref}_o),0) + 2.5u*min(1,max(0,V({vin})/5))"]
+    if v == "CJ431":
+        k, a = n["2"], n["3"]
+        return [f"B{ref} {k} {a} I = max(0, V({k},{a})-2.495)*5"]
+    if v == "TPS61040":
+        vin, sw, fb, en = n["5"], n["1"], n["3"], n["4"]
+        out_n = "N_V12_RAW"
+        # PFM mit Spitzenstrom 0,4 A, L = 10 µH, Mindest-Ausschaltzeit 400 ns, max. 1 MHz:
+        # Ausgangsstrom = Ilim/2 · Toff/T (Lücken), Wirkungsgrad 0,9 der Energie je Puls.
+        ton = f"(10u*0.4/max(V({vin}),0.5))"
+        toff = f"(10u*0.4/max(V({out_n})+0.4-V({vin}),0.5))"
+        per = f"max({ton}+max({toff},400n), 1u)"
+        imax = f"(0.9*0.2*{toff}/{per})"
+        enb = f"min(1,max(0,(V({en})-0.9)*5))"
+        iout = f"({enb}*min({imax}, max(0,(1.233-V({fb}))*20)))"
+        return [
+            f"B{ref}_out 0 {out_n} I = {iout}",
+            f"B{ref}_in {vin} 0 I = {iout}*V({out_n})/(max(V({vin}),1)*0.85) + 28u*{enb}",
+            f"R{ref}_sw {sw} 0 1e8",
+        ]
+    if v == "SP3485EN":
+        vcc, a, b, ro, re_, de, di = n["8"], n["6"], n["7"], n["1"], n["2"], n["3"], n["4"]
+        on = f"(V({vcc}) > 2 ? 1 : 0)"
+        rx = f"(V({re_}) < V({vcc})/2 ? 1 : 0)"
+        tx = f"(V({de}) > V({vcc})/2 ? 1 : 0)"
+        hi = f"(V({di}) > V({vcc})/2 ? 1 : 0)"
+        return [f"B{ref}_icc {vcc} 0 I = 1m*{on}",
+                f"R{ref}_ra {a} N_{ref}_mid 12k", f"R{ref}_rb {b} N_{ref}_mid 12k",
+                f"B{ref}_mid N_{ref}_mid 0 V = V({vcc})/2",
+                f"B{ref}_ro {ro} 0 I = {on}*{rx}*(V({ro}) - (V({a},{b}) > 0.2 ? V({vcc}) : 0))/50",
+                f"B{ref}_da {a} 0 I = {on}*{tx}*(V({a}) - {hi}*V({vcc}))/20",
+                f"B{ref}_db {b} 0 I = {on}*{tx}*(V({b}) - (1-{hi})*V({vcc}))/20",
+                f"R{ref}_re {re_} 0 1e9", f"R{ref}_de {de} 0 1e9"]
     raise SystemExit(f"kein IC-Modell für {ref} {v}")
 
 
-def settle(ng, sc: Scenario, t_end=0.08, extra_lines=()) -> dict[str, float]:
+def settle(ng, sc: Scenario, t_end=0.4, extra_lines=()) -> dict[str, float]:
     """Eingeschwungener Zustand: Quellen in 10 ms hochfahren, Werte am Ende der Simulation."""
     try:
-        res = ng.run(netlist(sc, f".tran 20u {t_end}", ramp="10m", extra_lines=list(extra_lines)))
+        res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98}", ramp="10m", extra_lines=list(extra_lines)))
     except RuntimeError:
-        # Ersatzweg bei Konvergenzproblemen: Gear-Verfahren, gröbere Toleranz
-        res = ng.run(netlist(sc, f".tran 20u {t_end}", ramp="10m",
-                             extra_lines=list(extra_lines) + [".options method=gear reltol=1e-3 abstol=1e-9"]))
+        # Ersatzweg bei Konvergenzproblemen: Trapez-Verfahren, gröbere Toleranz
+        res = ng.run(netlist(sc, f".tran 50u {t_end} {t_end * 0.98}", ramp="10m",
+                             extra_lines=list(extra_lines) + [".options method=trap reltol=2e-3 abstol=1e-9"]))
     return {k: v[-1] for k, v in res.items()}

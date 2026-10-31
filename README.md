@@ -14,7 +14,7 @@ Der Sender findet den Empfänger über eine geflutete Anfrage im Mesh und hält 
 
 Jedes Telegramm ist **13 Byte**: Pegel in mm (16 Bit), untere 16 Bit eines laufenden Zählers, Alter der Messung in Sekunden, plus 8 Byte HMAC (pro Sender eigener Schlüssel). Nicht verschlüsselt, aber fälschungssicher; der Empfänger erkennt den Sender am passenden Schlüssel. Zeitstempel für die API: Empfangszeit (UTC) minus `age_s`. Replay-Schutz über den 32-Bit-Zähler (nur 16 Bit im Funk). Implementierung: `firmware/common/pegel_packet.h`.
 
-Statt eines Pegels kann ein Fehlercode kommen: 1 Sonde antwortet nicht, 2 Wert außerhalb des Bereichs, 3 RS485-Wandler tot, 4 Akku fast leer (unter 2,8 V). Der Empfänger reicht den Code als `status` an die API durch. Die Akkuspannung selbst geht nicht über Funk.
+Statt eines Pegels kann ein Fehlercode kommen: 1 Sonde antwortet nicht, 2 Wert außerhalb des Bereichs, 3 RS485-Wandler tot (nur ältere Platine), 4 Akku fast leer (unter 2,8 V). Der Empfänger reicht den Code als `status` an die API durch. Die Akkuspannung selbst geht nicht über Funk.
 
 ## Geräte
 
@@ -26,113 +26,77 @@ Statt eines Pegels kann ein Fehlercode kommen: 1 Sonde antwortet nicht, 2 Wert a
 
 **Prototyp ohne Platine:** RS485-Modul an `Serial1`, in `pegel.ini` `PEGEL_BOARD=0`.
 
-**Mit Trägerplatine** (`PEGEL_BOARD=1`, Standard): RS485 über SC16IS740 (I²C), Sonde schaltbar an D0, Akku über INA226 — siehe unten.
+**Mit Trägerplatine** (`PEGEL_BOARD=1`, Standard) — siehe [Sender aufbauen](#sender-aufbauen).
 
-## Sender-Trägerplatine
+## Sender aufbauen
 
-Träger für XIAO nRF52840 + Wio-SX1262: Versorgung aus Solar oder 12-V-Netzteil, LiFePO4 1S optional, 3,3 V für den Funk-Stack, 12 V für die Pegelsonde (nur bei Messung), RS485 zur Sonde. Geplant für IP65-Gehäuse ~115 × 90 mm; KiCad-Projekt und Fertigungsdaten unter `hardware/pegel-sender/` (Gerber, BOM, CPL in `fab/`).
+Der Sender besteht aus der Trägerplatine mit gestecktem XIAO, einem Solarpanel (oder Netzteil), LiFePO4-Akku, Pegelsonde und — für den Winter — Heizwiderstand und Temperaturfühler am Akku. Technik, Schaltpläne und Bilder der Platine: [`hardware/pegel-sender/`](hardware/pegel-sender/README.md) (Grafiken in [`preview/`](hardware/pegel-sender/preview/)).
 
-### Anschlüsse
+### Was man braucht
+
+| Teil | Anforderung | Beispiel |
+|---|---|---|
+| Solarpanel | „12-V-Panel“ (36 Zellen, Arbeitspunkt ~18 V), Leerlauf höchstens 25 V; Größe siehe [Auslegung](#panel-und-akku-auslegen) | 10 W im Flachland, 30 W im Mittelgebirge |
+| *oder* Netzteil | 12 V Gleichspannung, mindestens 1 A, an dieselbe Klemme wie das Panel; Steckbrücke NETZTEIL setzen | Steckernetzteil 12 V / 1,5 A |
+| Akku | LiFePO4, **1 Zelle** (3,2 V), mehrere Zellen parallel; Anzahl siehe Auslegung. Keine Li-Ion-Zellen (4,2 V)! | 32700-Zellen 6 Ah, 2–3 parallel |
+| Sicherung | Kfz-Flachsicherung 5 A im Pluskabel des Akkus (die Platine hat keinen Kurzschlussschutz am Akku) | Mini-Flachsicherungshalter |
+| Pegelsonde | RS485 Modbus RTU, 9600 Baud 8N1, Adresse 1, Pegel in cm im Holding-Register 4; Versorgung 12 V, höchstens 30 mA | Druck-Pegelsonde 4–20 mA/RS485, 12–24 V |
+| Heizwiderstand | 68 Ω, 5 W, am bzw. um den Akku (nur bei Frost nötig) | Hochlastwiderstand 68 Ω 5 W |
+| Temperaturfühler | NTC 10 kΩ, B ≈ 3950, mit Leitung, **auf den Akku** kleben | MF52A103J3950 |
+| Gehäuse | IP65, innen ~115 × 90 mm für die Platine, besser gedämmt (z. B. 10–20 mm XPS) | |
+
+Ohne Temperaturfühler gilt der Akku als zu kalt: der Sender lädt dann nie und heizt. Den NTC also immer anschließen, auch im Sommer.
+
+### Anschlüsse und Jumper
 
 | Klemme | Belegung |
 |---|---|
-| SOLAR | + / − (Panel 10–30 W, siehe Auslegung, Leerlauf bis 25 V) |
-| 12V | + / − (Netzteil mindestens 12 V / 1,5 A) |
-| AKKU | + / − (LiFePO4 1S, z. B. 3× 32700 parallel, optional) |
-| SONDE | V+ rot, V− schwarz, A weiß, B blau (12–24 V, RS485 Modbus RTU, < 50 mA) |
+| **SOLAR/12V** (links oben) | + / − des Panels **oder** des 12-V-Netzteils |
+| **AKKU** (oben) | + / − der LiFePO4-Zelle(n), Sicherung im Pluskabel |
+| **HEIZ/NTC** (links unten) | H+ / H−: Heizwiderstand; NTC / NTC: Temperaturfühler (beliebig gepolt) |
+| **SONDE** (rechts) | V+ rot, V− schwarz, A weiß, B blau |
 
-Solar und Netzteil dürfen gleichzeitig stecken; die höhere Spannung speist, keine speist in die andere zurück. Der Akku ist optional: ohne Zelle hält der Lader die Platine auf 3,61 V.
-
-| Betrieb | Verhalten |
+| Jumper | Bedeutung |
 |---|---|
-| Solar mit Akku | Laden und Puffern, MPPT bei etwa 18 V |
-| Netzteil mit Akku | Laden aus 12 V |
-| Solar ohne Akku | Funk und Sonde direkt aus dem Panel |
-| Netzteil ohne Akku | Funk und Sonde direkt aus 12 V |
+| **NETZTEIL** (Steckbrücke) | **gesteckt** bei 12-V-Netzteil, **offen** bei Solarpanel. Ohne Brücke lädt ein Netzteil nicht; mit Brücke am Panel lädt es, aber nicht im besten Arbeitspunkt |
 
-Sonde nur während der Messung unter Spannung (MOSFET, Steuerung **D0**). Frost unter 0 °C sperrt nur das Laden, die Platine läuft weiter; die Heizung (~5 W) kommt aus Solar oder Netzteil, nicht aus dem Akku. Unter 2,8 V lässt der Sender die Sonde aus und meldet Fehlercode 4; ab 3,0 V wieder Pegel.
-
-**XIAO-Stapel:** Stiftleisten 2,54 mm unter dem XIAO, 2× 7-pol. Buchsen auf der Platine. **BAT am XIAO unbenutzt** — der eingebaute Li-Ion-Lader darf die LiFePO4-Zellen nicht sehen. USB-Flashen bei montiertem Akku: der XIAO läuft aus USB, eine ideale Diode (LM66100) sperrt den Rückweg in den 3,3-V-Wandler und den Akku.
-
-| Pin | Funktion |
-|---|---|
-| D1–D5, D8–D10 | Wio-SX1262 |
-| D6 / D7 | I²C (INA226, SC16IS740) |
-| D0 | Sondenversorgung ein (HIGH) |
+XIAO mit Wio-SX1262 auf die beiden Buchsenleisten stecken (USB-Buchse zeigt nach rechts zum Platinenrand, „USB ->“). Den Akku-Anschluss (BAT) am XIAO nicht benutzen. Flashen per USB geht auch mit angeschlossenem Akku.
 
 ### Panel und Akku auslegen
 
-Durch den Winter gerechnet (Oktober bis April, 18 Winter 2005–2023, stündliche Einstrahlung und Temperatur aus PVGIS), Panel 45° Süd, aber nur einen halben Tag in der Sonne, Akku gealtert auf 80 %. Den größten Teil des Verbrauchs macht der Funk, der dauernd empfängt (22 mW); die Sonde (50 mA an 12 V, mit Aufwärmen ~2,1 s je Messung) und das Senden kommen dazu.
+Durch den Winter gerechnet (Oktober bis April, 18 Winter 2005–2023, stündliche Einstrahlung und Temperatur aus PVGIS), Panel 45° Süd, aber nur einen halben Tag in der Sonne, Akku gealtert auf 80 %. Den größten Teil des Verbrauchs macht der Funk, der dauernd empfängt; die Sonde und das Senden kommen dazu.
 
 | Beispiel | Verbrauch | Panel | Akku (LiFePO4 6 Ah) | Tiefster Ladestand im schlechtesten Winter | Ohne jede Sonne |
 |---|---|---|---|---|---|
-| Flachland (Nürnberg, 320 m), Messung alle 15 min | 26 mW, 0,6 Wh/Tag | **10 W** | **2×** | 70 % (ungedämmt 65 %) | ~7 Wochen |
-| Mittelgebirge (4 Orte um 600 m), Messung jede Minute | 54 mW, 1,3 Wh/Tag | **30 W** | **3×** | 68 % (ungedämmt 54 %) | ~5 Wochen |
+| Flachland (Nürnberg, 320 m), Messung alle 15 min | 21 mW, 0,5 Wh/Tag | **10 W** | **2×** | 76 % (ungedämmt 75 %) | ~8 Wochen |
+| Mittelgebirge (4 Orte um 600 m), Messung jede Minute | 38 mW, 0,9 Wh/Tag | **30 W** | **3×** | 77 % (ungedämmt 68 %) | ~7 Wochen |
 
-Untergrenze ohne Reserve für Schnee auf dem Panel: im Flachland 10 W mit 1× 6 Ah, im Mittelgebirge 20 W mit 2× 6 Ah (Ladestand fällt bis 31 %). 5 W reichen auch im Flachland nicht sicher: die Heizung (65 Ω am Panel) nimmt bei kaltem Akku den ganzen Strom eines 5-W-Panels, geladen wird dann erst an milden Tagen. Mehr als 30 W bringt wenig, der Lader begrenzt bei 3 A.
+Untergrenze ohne Reserve für Schnee auf dem Panel: im Flachland 10 W mit 1× 6 Ah (Ladestand fällt bis 55 %), im Mittelgebirge 20 W mit 2× 6 Ah (bis 53 %). 5 W mit 1× 6 Ah reichen auch im Flachland nicht sicher: bei kaltem Akku nimmt die Heizung (~4 W) den ganzen Strom eines 5-W-Panels. Mehr als 30 W bringt wenig, der Lader lädt mit höchstens 2 A.
 
-Für den Winter: NTC an J4 auf die Zelle kleben (JP2 auf extern), damit erst geladen wird, wenn der Akku selbst warm ist; Gehäuse dämmen (halbiert die Heizenergie), Panel eher steiler (≥ 60°), damit Schnee abrutscht. Rechnung: `hardware/pegel-sender/verify/winter_energy.py`.
+Für den Winter: Gehäuse dämmen (halbiert die Heizenergie), Panel eher steil (≥ 60°) montieren, damit Schnee abrutscht. Rechnung: [`verify/winter_energy.py`](hardware/pegel-sender/verify/winter_energy.py).
 
-### Schaltung (Überblick)
+### Verhalten
 
-![Blockschaltplan](hardware/pegel-sender/preview/pegel-sender-schematic-blocks.png)
+- **Laden** mit bis zu 2 A bis 3,50 V; bei Frost gesperrt (Sperre unter ~1,2 °C am Akku, frei ab ~2,7 °C).
+- **Heizung** an unter ~3,8 °C, aus über ~5,2 °C, nur bei Sonne oder Netzteil — nie aus dem Akku.
+- **Sonde** ist nur während der Messung eingeschaltet.
+- **Akku fast leer:** unter 2,8 V bleibt die Sonde aus und der Sender meldet Fehlercode 4; ab 3,0 V wieder Pegel. Unter 2,6 V schaltet er Funk und Sonde ab und wartet, bis die Sonne den Akku wieder über 3,0 V geladen hat.
+- **Ohne Akku** läuft der Sender direkt aus Panel oder Netzteil, solange genug Licht da ist.
 
-Kernbauteile: CN3795 + 15 µH (Lader), HY2112 + Dual-MOSFET (Zellschutz), TPS63900 (3,3 V), TPS61040 + Lastschalter (Sonden-12 V), INA226 + 10 mΩ Shunt, SC16IS740 + MAX3485 (RS485). MPPT-Arbeitspunkt am Panel etwa 18 V; unter etwa 14 V (Netzteil) wird der Teiler entspannt. Bei anderem Panel den Solar-Teiler anpassen.
+### Platine bestellen
 
-Ansicht Bestückungsseite und Lötseite (KiCad-3D-Render):
+Fertigungsdaten für JLCPCB in [`hardware/pegel-sender/fab/`](hardware/pegel-sender/fab/): `pegel-sender-gerber.zip`, `pegel-sender-bom.csv`, `pegel-sender-cpl.csv`. Bestellung als „Economic PCBA“, einseitig bestückt, z. B. 2 Platinen. Alle SMD-Teile sind Basic- oder Preferred-Teile ohne Rüstgebühr; 2 bestückte Platinen kosten etwa **25–40 €** inklusive Versand und Steuer.
 
-![Bestückungsseite](hardware/pegel-sender/preview/pegel-sender-top.png)
+Selbst löten (Liste: `fab/pegel-sender-handbestueckung.csv`):
 
-![Lötseite](hardware/pegel-sender/preview/pegel-sender-bottom.png)
-
-Schaltplan je Funktionsblock (Symbole und Leitungen):
-
-![Solar](hardware/pegel-sender/preview/schematic-solar.png)
-
-![12 V](hardware/pegel-sender/preview/schematic-dc.png)
-
-![Lader](hardware/pegel-sender/preview/schematic-charger.png)
-
-![MPPT](hardware/pegel-sender/preview/schematic-mppt.png)
-
-![Akku](hardware/pegel-sender/preview/schematic-battery.png)
-
-![3,3 V](hardware/pegel-sender/preview/schematic-3v3.png)
-
-![Sonde 12 V](hardware/pegel-sender/preview/schematic-12v.png)
-
-![RS485](hardware/pegel-sender/preview/schematic-rs485.png)
-
-![Frost](hardware/pegel-sender/preview/schematic-frost.png)
-
-![XIAO](hardware/pegel-sender/preview/schematic-xiao.png)
-
-### Platine und Schaltplan erzeugen
-
-**Software:** [KiCad 10](https://www.kicad.org/download/), **Java (JRE)** für [Freerouting 2.5](https://github.com/freerouting/freerouting/releases) (`hardware/pegel-sender/build/freerouting.jar`, nicht versionieren).
-
-| Plattform | KiCad |
-|---|---|
-| Linux (Arch/Manjaro) | `pacman -S kicad kicad-library jre-openjdk` |
-| Linux (ohne root) | KiCad-AppImage nach `hardware/pegel-sender/build/kicad-appimage/` ([Download](https://www.kicad.org/download/linux/)); beim ersten Lauf extrahiert [`kicad_env.py`](hardware/pegel-sender/kicad_env.py) `squashfs-root` |
-| Windows | KiCad-Installer; `kicad_env.py` findet KiCad-Python und `kicad-cli.exe` unter `%LOCALAPPDATA%\Programs\KiCad` bzw. `Program Files\KiCad`. Schaltplan-PNGs: `py -m pip install pymupdf` (statt `rsvg-convert`) |
-
-Im Verzeichnis `hardware/pegel-sender/`:
-
-1. `python3 design.py` — Netzliste prüfen  
-2. KiCad-Python: `gen_pcb.py`  
-3. `route.py build/freerouting.jar` — DRC: 0 offen, 0 Kurzschluss/Kreuzung, 0 Siebdruck-Verstöße  
-4. `export.py` — Gerber/BOM/CPL nach `fab/`  
-5. `render_preview.py` — 3D-Bilder nach `preview/`  
-6. `schematic_blocks.py` — Blockschaltplan; `schematic.py` — Schaltplan je Funktionsblock, gegen die KiCad-Netzliste geprüft  
-
-**Platine neu erzeugen:** `python3 relayout.py` (Schritte 2–5). Bauteilpositionen stehen in `fixed_positions.py`; nach manueller Verschiebung in KiCad: KiCad-Python `dump_fixed.py` → `fixed_positions.py` aktualisieren, dann `relayout.py`.
-
-**Nur Siebdruck** auf gültiger Platine: KiCad-Python `gen_pcb.layout_silk(board)` speichern, dann `render_preview.py`.
-
-Quelle für Bauteile und Netze: [`design.py`](hardware/pegel-sender/design.py). Schaltplan-Grafiken: [`schematic.py`](hardware/pegel-sender/schematic.py) — Lage der Bauteile je Blatt in [`schematic_layout.py`](hardware/pegel-sender/schematic_layout.py) (Signalfluss links → rechts, Versorgung oben, Masse unten), Leitungen verlegt ein rechtwinkliger Router; Labels nur für Netze, die das Blatt verlassen. Zweipole dreht der Generator selbst (Versorgung oben, Masse unten). Symbolzugriff in `sch_symbols.py`. L1-3D: `3dmodels/L_Bourns_SRP1245A.step` (KiCad-2313AA-STEP auf 13,5×12,5×4,8 mm skaliert in `gen_pcb.py`).
-
-Platine 100 × 70 mm, 2 Lagen. Vor PCB-Bestellung Abstand der XIAO-Buchsen am realen Stapel messen (Soll 15,24 mm Reihenabstand). Siebdruck: `(c) Veit Götz`.
+| Teil | Wert | Beispiel |
+|---|---|---|
+| SOLAR/12V, AKKU | Schraubklemme 2-pol., Raster 5,08 mm | Phoenix MKDS 1,5/2-5,08 |
+| SONDE, HEIZ/NTC | Schraubklemme 4-pol., Raster 5,08 mm | Phoenix MKDS 1,5/4-5,08 |
+| L1 | Spule 15 µH, ≥ 2,4 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0914-150KL |
+| L2 | Spule 10 µH, ≥ 0,5 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0912-100KL |
+| XIAO | 2× Buchsenleiste 1×7, 2,54 mm | |
+| NETZTEIL | Stiftleiste 1×2, 2,54 mm + Steckbrücke | |
 
 ## Installation
 

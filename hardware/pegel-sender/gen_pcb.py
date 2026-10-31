@@ -23,23 +23,30 @@ FP_ROOT = kicad_env.footprint_root()
 W, H = 100.0, 70.0          # Platinengröße in mm (IP65-Gehäuse ca. 115 × 90 mm)
 ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
 
-# Netzklassen: (Name, Bahnbreite, Via-Durchmesser, Netze). Die Breite muss an die engsten Pins des Netzes passen
-# (VSYS und +3V3 liegen an 0,5-mm-Pins, bleiben schmal); die 3 A tragen dort Kupferflächen (route.py), GND ist Fläche.
-NETCLASSES = [
-    ("Power3A", 1.2, 1.2, {"SOLAR_RAW", "SOLAR_F", "DC_RAW", "DC_F", "CHG_SW", "BAT_P", "HEAT_N"}),
-    ("Power1A", 0.6, 0.8, {"VSOL", "CHG_CSP", "BST_SW"}),
-    ("Power", 0.4, 0.6, {"BAT_N", "PROT_D", "V12_RAW", "V12_PROBE", "HEAT_PU"}),
+# Bahnbreite je Netz mit Reserve (IPC-2221, 35 µm außen, ≤ 10 K Erwärmung): 2,0 mm trägt ~4 A, 0,8 mm ~2 A,
+# 0,6 mm ~1,6 A, 0,3 mm ~0,9 A. Die 3-A-Pfade liegen zusätzlich als Kupferflächen (route.py).
+NET_WIDTH = [
+    (2.0, {"CHG_SW", "CHG_OUT", "BAT_N"}),                                   # Ladestrom 2 A
+    (1.2, {"VSYS"}),                                                          # Ladestrom und Lasten
+    (0.8, {"IN_RAW", "VSOL", "HEAT_N", "BST_SW"}),                           # bis 1,2 A
+    (0.6, {"V12_RAW", "V12_PROBE", "XIAO_3V3"}),                             # bis 0,15 A
+    (0.5, {"RS_VCC", "+5V"}),
+    (0.4, {"GND"}),                                                           # sonst Fläche
 ]
+DEFAULT_WIDTH = 0.3
+# Abstand: 0,3 mm für Netze über 12 V und die Leistungsnetze, sonst 0,25 mm. An Bauteilen mit engerem Pinabstand
+# (0,5-mm-Raster) gilt für deren Netze der Abstand zwischen den Pads, mindestens 0,2 mm.
+HV_NETS = {"IN_RAW", "VSOL", "CHG_SW", "CHG_BOOT", "BST_SW", "V12_RAW", "V12_PROBE", "HEAT_N", "HEAT_G", "VIN_J",
+           "CHG_PGD"}
+CLEARANCE, CLEARANCE_HV, CLEARANCE_MIN = 0.25, 0.3, 0.2
 
 # Feste Lage aller Bauteile: fixed_positions.py (dump_fixed.py aus gerouteter Platine).
 
-KEEPOUT_XIAO = (70.0, 7.0, 99.0, 31.5)   # unter dem XIAO-Stapel und seiner Beschriftung nichts automatisch platzieren
+KEEPOUT_XIAO = (76.5, 7.0, 99.0, 28.5)   # unter dem XIAO-Stapel: kein Siebdruck
 MARGIN = 0.4
 
 # KiCad L_Bourns_SRP2313AA.step native ~23.5×22×12.6 mm → SRP1245A 13.5×12.5×4.8 mm
-PROJECT_MODELS = {
-    "L1": ("3dmodels/L_Bourns_SRP1245A.step", (0.574, 0.568, 0.381)),
-}
+PROJECT_MODELS = {}
 
 
 def apply_project_models(fps):
@@ -232,13 +239,13 @@ def shove_text(text, start, pads, holes, taken, bodies=(), max_radius=13.0):
 
 # (Text, x, y, Höhe mm, Ausrichtung wie label(): 0 Mitte, -1 links, 1 rechts[, Winkel])
 BOARD_LABELS = [
-    ("SOLAR max 25V", 14.5, 15.0, 0.85, -1),
-    ("12V min 1,5A", 14.5, 34.0, 0.8, -1),
-    ("AKKU LiFePO4 3,2V", 14.5, 53.0, 0.75, -1),
+    ("SOLAR/12V max 25V", 16.5, 2.3, 0.7, 0),
+    ("AKKU LiFePO4", 50.0, 2.2, 0.7, 0),
+    ("HEIZUNG / NTC", 12.6, 50.1, 0.7, 0, 90),
     ("SONDE 12V RS485", 79.8, 45.6, 0.75, 0, 90),   # senkrecht links neben den J3-Pin-Texten
     ("XIAO + Wio-SX1262", 74.0, 3.4, 0.75, 0),
     ("USB ->", 88.0, 5.2, 0.7, 0),
-    ("pegel-sender v1", 20.0, 68.4, 0.8, 0),
+    ("pegel-sender v2", 30.0, 68.4, 0.8, 0),
     ("(c) Veit Götz", 52.0, 68.4, 0.8, 0),
 ]
 
@@ -336,16 +343,47 @@ def setup_board(board):
     default.SetClearance(mm(0.2))
     default.SetViaDiameter(mm(0.6))
     default.SetViaDrill(mm(0.3))
-    for name, width, via, members in NETCLASSES:
+
+
+def _pad_gap_limits(board):
+    """Kleinster Abstand jedes Netzes zu einem fremden Pad im selben Bauteil."""
+    limit = {}
+    for fp in board.GetFootprints():
+        pads = [(p.GetNetname(), item_box(p)) for p in fp.Pads()]
+        for i, (na, a) in enumerate(pads):
+            for nb, b in pads[i + 1:]:
+                if na == nb and na:
+                    continue
+                gap = max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3])
+                for n in (na, nb):
+                    if n:
+                        limit[n] = min(limit.get(n, 99.0), gap)
+    return limit
+
+
+def assign_netclasses(board):
+    """Netzklasse je (Breite, Abstand). Breite aus NET_WIDTH, Abstand durch die engsten Pads des Netzes begrenzt."""
+    ns = board.GetDesignSettings().m_NetSettings
+    limit = _pad_gap_limits(board)
+    width_of = {n: w for w, members in NET_WIDTH for n in members}
+    classes = {}
+    for net in sorted(design.nets()):
+        want = CLEARANCE_HV if net in HV_NETS else CLEARANCE
+        clr = max(CLEARANCE_MIN, min(want, math.floor(limit.get(net, 99.0) * 20 + 1e-6) / 20))
+        classes.setdefault((width_of.get(net, DEFAULT_WIDTH), clr), []).append(net)
+    for (width, clr), members in sorted(classes.items()):
+        name = f"W{width:g}_C{clr:g}"
         nc = pcbnew.NETCLASS(name)
         nc.SetTrackWidth(mm(width))
-        nc.SetClearance(mm(0.2))
+        nc.SetClearance(mm(clr))
+        via = 1.2 if width >= 1.5 else 0.8 if width >= 0.8 else 0.6
         nc.SetViaDiameter(mm(via))
-        # Via-Hülse 20 µm: 0,6 mm Bohrung trägt wie ~1,1 mm Bahn (3 A), 0,4 mm wie ~0,7 mm
+        # Via-Hülse 20 µm: 0,6 mm Bohrung trägt wie ~1,1 mm Bahn, zwei davon reichen für 3 A
         nc.SetViaDrill(mm(0.6 if via >= 1.2 else 0.4 if via > 0.6 else 0.3))
         ns.SetNetclass(name, nc)
         for net in members:
             ns.SetNetclassPatternAssignment(net, name)
+        print(f"netclass {name}: {len(members)} nets")
 
 
 def outline(board):
@@ -377,23 +415,20 @@ def label(board, text, x, y, size=1.2, align=0):
 # Beschriftung der Klemmen: Ref -> Text je Pin, steht neben dem Pin auf der Platinenseite der Klemme.
 PIN_LABELS = {
     "J1": {"1": "+", "2": "-"},
-    "J7": {"1": "+", "2": "-"},
-    "J2": {"1": "+", "2": "-"},
+    "J2": {"1": "-", "2": "+"},
+    "J4": {"1": "H+", "2": "H-", "3": "NTC", "4": "NTC"},
     "J3": {"1": "V+ rot", "2": "V- schwarz", "3": "A weiss", "4": "B blau"},
 }
 PIN_TEXTS = {v for m in PIN_LABELS.values() for v in m.values()}
-# Bauteile, deren Wert auf dem Bestückungsdruck steht (Lötbrücken, optionaler Stecker).
-SHOW_VALUE = {"JP1", "JP2", "J4"}
+# Bauteile, deren Wert auf dem Bestückungsdruck steht (Lötbrücke, Steckbrücke).
+SHOW_VALUE = {"JP2"}
 # (x, y, Höhe mm, align) — Werte weg von Nachbar-Silk (DRC)
 VALUE_FIELDS = {
-    "J4": (31.5, 41.0, 0.55, -1),
-    "JP2": (33.0, 51.5, 0.55, -1),
+    "JP2": (25.5, 42.3, 0.6, 0),
 }
 # Ref-Designator abseits dichtem Nachbar-Silk
 REF_FIELDS = {
-    "R16": (71.2, 52.4, 0.55, 0),
     "J6": (82.8, 26.2, 0.55, 0),
-    "R27": (30.9, 44.3, 0.6, 0),
 }
 
 
@@ -409,12 +444,16 @@ def pin_labels(board, fps, pads=None, holes=None, taken=None, bodies=None):
             if not text:
                 continue
             y = pcbnew.ToMM(pad.GetPosition().y) - ORIGIN[1]
-            if ref == "J3":
-                anchor = l - 1.4
+            if ref == "J2":   # Klemme an der Oberkante: Text unter dem Pin
+                t = label(board, text, pcbnew.ToMM(pad.GetPosition().x) - ORIGIN[0], bbox_mm(fp)[3] + 0.9, 0.75, 0)
+                anchor, y = pcbnew.ToMM(pad.GetPosition().x) - ORIGIN[0], bbox_mm(fp)[3] + 0.9
             else:
-                anchor = r + 1.2 if right_side else l - 1.2
-            align = -1 if right_side else 1
-            t = label(board, text, anchor, y, 0.75, align)
+                if ref == "J3":
+                    anchor = l - 1.4
+                else:
+                    anchor = r + 1.2 if right_side else l - 1.2
+                align = -1 if right_side else 1
+                t = label(board, text, anchor, y, 0.75, align)
             if pads is not None:
                 if not place_field_text(t, (anchor, y), pads, holes, taken, bodies):
                     shove_text(t, (anchor, y), pads, holes, taken, bodies, max_radius=6.0)
@@ -470,6 +509,7 @@ def main():
     if missing:
         raise SystemExit(f"FIXED fehlt für: {', '.join(sorted(missing))}")
 
+    assign_netclasses(board)
     apply_project_models(fps)
     layout_silk(board)
 

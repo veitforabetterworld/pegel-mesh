@@ -25,9 +25,9 @@ SITES = REGIONS[sys.argv[1] if len(sys.argv) > 1 else "mittelgebirge"]
 INTERVAL = float(sys.argv[2]) if len(sys.argv) > 2 else 60
 
 # --- Verbraucher (W aus dem Akku) ---
-P_BASE = 3.3 * 0.006 / 0.9 + 3.25 * 0.0006           # XIAO + SX1262 in RX, Platine (INA226, Teiler)
-P_TX = 3.3 * 0.120 * 0.38 / INTERVAL / 0.9 + 0.0002   # 1 Paket je Messung, 0,38 s Airtime bei 22 dBm, + Pfadprüfung
-P_PROBE = 12.3 * 0.050 / 0.82 + 3.25 * 0.004          # Sonde 50 mA an 12,3 V, LM2735 82 %, Wandler+RS485
+P_BASE = 3.3 * 0.006 + 3.3 * 0.00002                 # XIAO + SX1262 in RX direkt aus dem Akku, Teiler
+P_TX = 3.3 * 0.120 * 0.38 / INTERVAL + 0.0002         # 1 Paket je Messung, 0,38 s Airtime bei 22 dBm, + Pfadprüfung
+P_PROBE = 12.46 * 0.030 / 0.85 + 3.3 * 0.0013         # Sonde 30 mA an 12,46 V, TPS61040 85 %, SP3485
 LOADS = {"Sonde 2,1 s je Messung": 2.1 / INTERVAL}
 P_LOW = P_BASE + P_TX                                 # unter 2,8 V: Sonde aus, nur Fehlercode
 
@@ -39,15 +39,16 @@ C2 = (VMP / VOC - 1) / np.log(1 - 1 / ISC_RATIO)
 C1 = (1 - 1 / ISC_RATIO) * np.exp(-VMP / (C2 * VOC))
 N_VT = 36 * 1.3 * 0.0257
 SYS_LOSS = 0.90            # Verschmutzung, Fehlanpassung, Leitungen
-V_MPPT = 18.0
-R_HEAT = 390 / 6
-ETA_CHG = 0.87
-P_CHG_MAX_OUT = 3.0 * 3.4
+V_MPPT = 17.2              # Panel-Arbeitspunkt der Regelung (LM324, Kanal B)
+R_HEAT = 68.0              # Heizwiderstand am Akku (J4)
+ETA_CHG = 0.85             # TPS5430 mit Rückstromsperre und Shunt
+P_CHG_MAX_OUT = 2.0 * 3.4  # Ladestrom 2 A
+P_CTRL = 17.2 * 0.004      # Regelung (HT7550, LM324, CJ431) aus dem Panel, nur bei Sonne
 ETA_BAT = 0.96
 
 # --- Wärme ---
-T_HEAT_ON, T_HEAT_OFF = 3.55, 5.3
-T_INH_ON, T_INH_OFF = 1.15, 3.3
+T_HEAT_ON, T_HEAT_OFF = 3.75, 5.16
+T_INH_ON, T_INH_OFF = 1.15, 2.69
 
 PANELS = [5, 10, 15, 20, 30]
 CELLS = [1, 2, 3]
@@ -147,8 +148,8 @@ def run():
         tc = ta + 0.03 * g
         isc, voc = panel(g, tc, wp)
         i18 = i_at(V_MPPT, isc, voc)
-        p_free = i18 * V_MPPT                                    # Heizung aus
-        p_shared = np.maximum(i18 - V_MPPT / R_HEAT, 0) * V_MPPT  # Heizung an und Panel trägt 18 V
+        p_free = np.maximum(i18 * V_MPPT - P_CTRL, 0)                      # Heizung aus
+        p_shared = np.maximum((i18 - V_MPPT / R_HEAT) * V_MPPT - P_CTRL, 0)  # Heizung an und Panel trägt V_MPPT
         v_h = np.where(i18 >= V_MPPT / R_HEAT, V_MPPT, heater_only_voltage(isc, voc))
         p_h = np.where(v_h > 8.0, v_h ** 2 / R_HEAT, 0)          # Q7 schaltet erst ab ~8 V
         for _ in range(sub):

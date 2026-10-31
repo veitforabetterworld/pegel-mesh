@@ -52,36 +52,31 @@ def arrow(a: tuple[float, float], b: tuple[float, float], via: list[tuple[float,
 
 def build() -> str:
     parts = []
-    parts.append(box("solar", 40, 48, 170, 88, "Solar", ["J1", "MPPT etwa 18 V"]))
-    parts.append(box("dc", 40, 168, 170, 88, "12 V", ["J7 Netzteil", "min. 1,5 A"]))
-    parts.append(box("charger", 290, 68, 200, 168, "CN3795", ["VSOL nach VSYS", "3,61 V", "mit und ohne Akku"]))
-    parts.append(box("vsys", 570, 68, 160, 168, "VSYS", ["3,6 V System"]))
-    parts.append(box("v33", 810, 48, 210, 88, "TPS63900", ["3,3 V", "LM66100 zum XIAO"]))
+    parts.append(box("solar", 40, 68, 170, 168, "Eingang J1", ["Solar oder 12 V", "Steckbrücke JP2:", "Netzteil"]))
+    parts.append(box("charger", 290, 68, 200, 168, "TPS5430", ["Lader 3,50 V, 2 A", "LM324 regelt Strom,", "Panel 17 V, Frost"]))
+    parts.append(box("vsys", 570, 68, 160, 168, "VSYS", ["Akku 2,8–3,5 V", "nachts getrennt"]))
+    parts.append(box("v33", 810, 48, 210, 88, "B5819W", ["Akku direkt", "zum XIAO"]))
     parts.append(box("v12", 810, 168, 210, 88, "TPS61040", ["12 V Sonde", "Schaltbar über D0"]))
-    parts.append(box("xiao", 1100, 48, 230, 88, "XIAO nRF52840", ["Wio-SX1262", "MeshCore-Sender"]))
-    parts.append(box("bat", 40, 360, 250, 110, "Akku optional", ["INA226, HY2112", "LiFePO4 1S, J2"]))
-    parts.append(box("frost", 360, 360, 270, 110, "Frost / Heizung", ["Laden aus unter 0 °C", "Heizung aus VSOL"]))
-    parts.append(box("rs485", 700, 360, 360, 110, "RS485 Sonde", ["SC16IS740 + MAX3485", "Klemme J3"]))
+    parts.append(box("xiao", 1100, 48, 230, 88, "XIAO nRF52840", ["Wio-SX1262", "misst Akku an VDD"]))
+    parts.append(box("bat", 40, 360, 250, 110, "Akku J2", ["LiFePO4 1S", "Shunt im Minuspol"]))
+    parts.append(box("frost", 360, 360, 270, 110, "Frost / Heizung J4", ["NTC und Heizwiderstand", "am Akku, aus VSOL"]))
+    parts.append(box("rs485", 700, 360, 360, 110, "RS485 Sonde", ["SP3485, Richtung automatisch", "Klemme J3"]))
 
-    # Eingänge treffen die linke Kante von CN3795
-    parts.append(arrow(pt("solar", "right"), pt("charger", "left", 0.28)))
-    parts.append(arrow(pt("dc", "right"), pt("charger", "left", 0.72)))
+    parts.append(arrow(pt("solar", "right"), pt("charger", "left")))
     parts.append(arrow(pt("charger", "right"), pt("vsys", "left")))
     parts.append(arrow(pt("vsys", "right", 0.28), pt("v33", "left")))
     parts.append(arrow(pt("vsys", "right", 0.72), pt("v12", "left")))
     parts.append(arrow(pt("v33", "right"), pt("xiao", "left")))
 
-    # VSYS nach unten: Akku und Frost
+    # VSYS nach unten zum Akku; Frost greift in den Lader ein
     vx, vy = pt("vsys", "bottom", 0.35)
     bx, by = pt("bat", "top", 0.72)
     parts.append(arrow((vx, vy), (bx, by), [(vx, 320), (bx, 320)]))
     fx, fy = pt("frost", "top", 0.35)
-    parts.append(arrow((vx + 40, vy), (fx, fy), [(vx + 40, 320), (fx, 320)]))
+    cx, cy = pt("charger", "bottom", 0.5)
+    parts.append(arrow((fx, fy), (cx, cy), [(fx, 300), (cx, 300)]))
 
-    # 3,3 V und Sonden-12 V zur RS485-Klemme
-    rx, ry = pt("rs485", "top", 0.35)
-    ax, ay = pt("v33", "left", 0.82)
-    parts.append(arrow((ax, ay), (rx, ry), [(770, ay), (770, 320), (rx, 320)]))
+    # Sonden-12 V zur RS485-Klemme
     sx, sy = pt("v12", "bottom")
     tx, ty = pt("rs485", "top", 0.7)
     parts.append(arrow((sx, sy), (tx, ty)))
