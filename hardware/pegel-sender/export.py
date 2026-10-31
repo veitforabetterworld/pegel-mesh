@@ -25,12 +25,13 @@ FAB = os.path.join(HERE, "fab")
 GERBER = os.path.join(FAB, "gerber")
 
 # JLCPCB zählt die Drehung mancher Gehäuse anders als KiCad (Pin 1 woanders). Korrektur in Grad, zur
-# KiCad-Drehung addiert; Werte aus JLCKicadTools (cpl_rotations_db.csv), erster Treffer gilt.
+# KiCad-Drehung addiert, erster Treffer gilt. Im JLCPCB-Bestückungsviewer an den hier verwendeten LCSC-Teilen
+# geprüft (10/2026); SOT-23-5, SOD und SMA/SMB sowie TI PowerPAD (C9864) brauchen keine Korrektur.
 ROTATION_FIX = [
-    (r"^SOT-23", -90),
+    (r"^SOT-23-5", 0),
+    (r"^SOT-23", 180),
     (r"^SOT-89", 180),
     (r"^SOIC-", 270),
-    (r"^TI_SO-PowerPAD-8", 270),
 ]
 
 
