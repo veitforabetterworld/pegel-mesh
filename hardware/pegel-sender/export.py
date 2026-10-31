@@ -26,16 +26,15 @@ GERBER = os.path.join(FAB, "gerber")
 
 # JLCPCB zählt die Drehung mancher Gehäuse anders als KiCad (Pin 1 woanders). Korrektur in Grad, zur
 # KiCad-Drehung addiert, erster Treffer gilt. Im JLCPCB-Bestückungsviewer an den hier verwendeten LCSC-Teilen
-# geprüft (10/2026); SOT-23-5, SOD und SMA/SMB sowie TI PowerPAD (C9864) brauchen keine Korrektur.
+# geprüft (10/2026); SOD, SMA/SMB und TI PowerPAD (C9864) brauchen keine Korrektur.
 ROTATION_FIX = [
-    (r"^SOT-23-5", 0),
+    (r"^SOT-23-5", 270),
     (r"^SOT-23", 180),
     (r"^SOT-89", 180),
     (r"^SOIC-", 270),
 ]
 # Einzelne LCSC-Teile, deren JLC-Modell vom Gehäuse-Standard abweicht (Korrektur ersetzt ROTATION_FIX).
-# B0540W (C7420325): Kathode des Modells auf der Gegenseite der übrigen SOD-123.
-LCSC_ROTATION_FIX = {"C7420325": 180}
+LCSC_ROTATION_FIX: dict = {}
 
 
 def jlc_rotation(footprint: str, rot: float, lcsc: str = "") -> float:
