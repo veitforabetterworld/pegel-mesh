@@ -10,6 +10,7 @@ stehen in fab/pegel-sender-handbestueckung.csv.
 
 import csv
 import os
+import re
 import sys
 import zipfile
 from collections import OrderedDict
@@ -22,6 +23,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PCB = os.path.join(HERE, "pegel-sender.kicad_pcb")
 FAB = os.path.join(HERE, "fab")
 GERBER = os.path.join(FAB, "gerber")
+
+# JLCPCB zählt die Drehung mancher Gehäuse anders als KiCad (Pin 1 woanders). Korrektur in Grad, zur
+# KiCad-Drehung addiert; Werte aus JLCKicadTools (cpl_rotations_db.csv), erster Treffer gilt.
+ROTATION_FIX = [
+    (r"^SOT-23", -90),
+    (r"^SOT-89", 180),
+    (r"^SOIC-", 270),
+    (r"^TI_SO-PowerPAD-8", 270),
+]
+
+
+def jlc_rotation(footprint: str, rot: float) -> float:
+    for pattern, fix in ROTATION_FIX:
+        if re.match(pattern, footprint):
+            return (rot + fix) % 360
+    return rot % 360
 
 
 def main():
@@ -39,7 +56,7 @@ def main():
         for f in sorted(os.listdir(GERBER)):
             z.write(os.path.join(GERBER, f), f)
 
-    assembled = {p.ref for p in design.PARTS if p.lcsc and not p.hand and not p.dnp}
+    assembled = {p.ref: p for p in design.PARTS if p.lcsc and not p.hand and not p.dnp}
     pos = os.path.join(FAB, "pos-raw.csv")
     kicad_env.run_kicad_cli(
         "pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "both",
@@ -52,8 +69,9 @@ def main():
         for row in csv.DictReader(f):
             if row["Ref"] not in assembled:
                 continue
+            rot = jlc_rotation(assembled[row["Ref"]].footprint.split(":")[1], float(row["Rot"]))
             w.writerow([row["Ref"], f'{float(row["PosX"]):.3f}mm', f'{float(row["PosY"]):.3f}mm',
-                        "Top" if row["Side"] == "top" else "Bottom", row["Rot"]])
+                        "Top" if row["Side"] == "top" else "Bottom", f"{rot:g}"])
     os.remove(pos)
 
     groups: "OrderedDict[tuple, list]" = OrderedDict()
