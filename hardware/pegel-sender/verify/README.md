@@ -46,6 +46,18 @@ Alle 19 Betriebsfälle erfüllen ihre Funktion, kein Bauteil liegt über seiner 
 | Sonde 12 V | 12,3 V bei 30/80 mA, 12,2 V bei 200 mA; bei 2,8 V Zelle und 200 mA zieht der Wandler 1,2 A aus dem Akku (L3 und U5 bei 43 % / 75 %) |
 | Firmware | Pegel lesen, Fehlercodes ohne Antwort / außer Bereich / ohne Schnittstelle, INA226-Strom und -Spannung, Unterspannung mit Hysterese 2,8 / 3,0 V |
 
+Langzeit (quasistatisch, 20-min-Schritte, Start bei 30 %):
+
+| | Winter, 3 Tage (−12 … 0 °C) | Sommer, 2 Tage |
+|---|---|---|
+| Ladezustand | 30 % → 20,3 % (Ladesperre die ganze Zeit, 0 A geladen) | 30 % → 99,5 %, 21 Ah geladen |
+| Heizung aus dem Panel | 101 Wh, ~0,32 A mittags; nachts 0 A | 0 Wh |
+| VSYS / +3V3 | 3,25–3,27 V / ≥ 3,30 V | 3,27–3,61 V / ≥ 3,30 V |
+| Akkustrom nachts | −24 mA | −23 mA |
+
+Ohne Sonne reicht ein voller Akku (18 Ah, Mittel 21,5 mA) etwa 35 Tage. Das Modell erwärmt den Akku nicht
+durch die Heizung (NTC sieht die Lufttemperatur); in echt gibt die Ladesperre an sonnigen Wintertagen früher frei.
+
 Knapp, aber innerhalb der Grenzen (≥ 80 %):
 
 - **D1 (SMBJ26A am Panel) 97 % der Sperrspannung** bei −25 °C Leerlauf (25,3 V). Leckstrom steigt nahe Vwm, Durchbruch erst ab 28,9 V. Ein größerer TVS würde im Ernstfall über die 33 V des CN3795 klemmen.
