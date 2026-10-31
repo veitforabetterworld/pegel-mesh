@@ -36,7 +36,7 @@ Träger für XIAO nRF52840 + Wio-SX1262: Versorgung aus Solar oder 12-V-Netzteil
 
 | Klemme | Belegung |
 |---|---|
-| SOLAR | + / − (Panel typ. 10–20 W, Leerlauf bis 25 V) |
+| SOLAR | + / − (Panel 10–30 W, siehe Auslegung, Leerlauf bis 25 V) |
 | 12V | + / − (Netzteil mindestens 12 V / 1,5 A) |
 | AKKU | + / − (LiFePO4 1S, z. B. 3× 32700 parallel, optional) |
 | SONDE | V+ rot, V− schwarz, A weiß, B blau (12–24 V, RS485 Modbus RTU, < 50 mA) |
@@ -59,6 +59,19 @@ Sonde nur während der Messung unter Spannung (MOSFET, Steuerung **D0**). Frost 
 | D1–D5, D8–D10 | Wio-SX1262 |
 | D6 / D7 | I²C (INA226, SC16IS740) |
 | D0 | Sondenversorgung ein (HIGH) |
+
+### Panel und Akku auslegen
+
+Durch den Winter gerechnet (Oktober bis April, 18 Winter 2005–2023, stündliche Einstrahlung und Temperatur aus PVGIS), Panel 45° Süd, aber nur einen halben Tag in der Sonne, Akku gealtert auf 80 %. Den größten Teil des Verbrauchs macht der Funk, der dauernd empfängt (22 mW); die Sonde (50 mA an 12 V, mit Aufwärmen ~2,1 s je Messung) und das Senden kommen dazu.
+
+| Beispiel | Verbrauch | Panel | Akku (LiFePO4 6 Ah) | Tiefster Ladestand im schlechtesten Winter | Ohne jede Sonne |
+|---|---|---|---|---|---|
+| Flachland (Nürnberg, 320 m), Messung alle 15 min | 26 mW, 0,6 Wh/Tag | **10 W** | **2×** | 70 % (ungedämmt 65 %) | ~7 Wochen |
+| Mittelgebirge (4 Orte um 600 m), Messung jede Minute | 54 mW, 1,3 Wh/Tag | **30 W** | **3×** | 68 % (ungedämmt 54 %) | ~5 Wochen |
+
+Untergrenze ohne Reserve für Schnee auf dem Panel: im Flachland 10 W mit 1× 6 Ah, im Mittelgebirge 20 W mit 2× 6 Ah (Ladestand fällt bis 31 %). 5 W reichen auch im Flachland nicht sicher: die Heizung (65 Ω am Panel) nimmt bei kaltem Akku den ganzen Strom eines 5-W-Panels, geladen wird dann erst an milden Tagen. Mehr als 30 W bringt wenig, der Lader begrenzt bei 3 A.
+
+Für den Winter: NTC an J4 auf die Zelle kleben (JP2 auf extern), damit erst geladen wird, wenn der Akku selbst warm ist; Gehäuse dämmen (halbiert die Heizenergie), Panel eher steiler (≥ 60°), damit Schnee abrutscht. Rechnung: `hardware/pegel-sender/verify/winter_energy.py`.
 
 ### Schaltung (Überblick)
 

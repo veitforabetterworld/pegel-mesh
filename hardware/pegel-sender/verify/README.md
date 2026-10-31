@@ -7,6 +7,7 @@ Alles läuft auf Windows mit dem ngspice aus KiCad (`ngspice.dll` über ctypes),
 | `run_stress.py` | 19 Betriebsfälle (Tag/Nacht, Frost, Netzteil, Sondenspitze, Akku leer/voll), Funktion und Belastung jedes Bauteils gegen sein Datenblatt | `report/stress.md` |
 | `sweeps.py` | Temperatur-, Netzteil- und Akkurampen (Hysterese in beide Richtungen), Einschalten der Sonde bei 30/80/200 mA | `report/sweeps.md` + Bilder |
 | `longterm.py` | Mehrere Tage Winter und Sommer, quasistatisch alle 20 min, Ladezustand integriert | `report/longterm.md` + Bilder |
+| `winter_energy.py` | Panel- und Akkugröße über 18 Winter (PVGIS stündlich), Verschattung, Heizung, Ladesperre; Argumente `mittelgebirge`/`flachland` und Messabstand in s | Konsole |
 | `pcb_check.py` | Breitester Kupferweg jedes Hochstrompfads gegen IPC-2221 (KiCad-Python) | `report/pcb.md` |
 | `../../../firmware/test` | Firmware gegen nachgebildeten SC16IS740, Modbus-Sonde und INA226 (g++) | Konsole |
 
