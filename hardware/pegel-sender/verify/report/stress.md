@@ -4,14 +4,11 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 
 | Bauteil | Größe | Wert | Grenze | Auslastung | Fall |
 |---|---|---:|---:|---:|---|
-| D1 | U Sperr [V] (≤ Vwm) | 25.3 | 26 | 97 % ⚠ | Panel offen −25 °C, Akku voll |
 | J6 | U XIAO_3V3 [V] | 3.3 | 3.6 | 92 % ⚠ | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
+| D1 | U Sperr [V] (≤ Vwm) | 25.3 | 28 | 90 % ⚠ | Panel offen −25 °C, Akku voll |
 | J5 | U I2C_SCL [V] | 3.3 | 3.9 | 85 % ⚠ | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | J6 | U I2C_SDA [V] | 3.3 | 3.9 | 85 % ⚠ | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | J5 | U SENS_EN [V] | 3.3 | 3.9 | 85 % ⚠ | Nacht −20 °C, Messung 80 mA + Funk |
-| Q9 | Uds [V] | -25 | 30 | 83 % ⚠ | Panel offen −25 °C, Akku voll |
-| Q9 | Ugs [V] | -9.96 | 12 | 83 % ⚠ | Netzteil 13,8 V + Sonne, 20 °C |
-| D12 | U Sperr [V] (≤ Vwm) | 12.3 | 15 | 82 % ⚠ | Nacht −20 °C, Messung 80 mA + Funk |
 | R28 | P [W] | 1.6 | 2 | 80 %  | Panel offen −25 °C, Akku voll |
 | R29 | P [W] | 1.6 | 2 | 80 %  | Panel offen −25 °C, Akku voll |
 | R30 | P [W] | 1.6 | 2 | 80 %  | Panel offen −25 °C, Akku voll |
@@ -24,7 +21,9 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | U1 | U CHG_LED [V] | 24 | 33 | 73 %  | Panel offen −25 °C, Akku voll |
 | U6 | U +3V3 [V] | 3.3 | 4.6 | 72 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | C2 | U [V] | 25 | 35 | 71 %  | Panel offen −25 °C, Akku voll |
+| D12 | U Sperr [V] (≤ Vwm) | 12.3 | 18 | 68 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | F2 | I [A] | 1 | 1.5 | 67 %  | Netzteil 12 V, 20 °C, Akku 30 % |
+| Q9 | Uds [V] | -25 | 40 | 62 %  | Panel offen −25 °C, Akku voll |
 | D9 | U Sperr [V] | 24.6 | 40 | 62 %  | Panel offen −25 °C, Akku voll |
 | U4 | U VSYS [V] | 3.61 | 6 | 60 %  | Akku 3,8 V (Überladeschutz) |
 | U5 | U VSYS [V] | 3.61 | 6 | 60 %  | Akku 3,8 V (Überladeschutz) |
@@ -44,6 +43,7 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | C3 | U [V] | 25 | 50 | 50 %  | Panel offen −25 °C, Akku voll |
 | C4 | U [V] | 25 | 50 | 50 %  | Panel offen −25 °C, Akku voll |
 | C22 | U [V] | 25 | 50 | 50 %  | Panel offen −25 °C, Akku voll |
+| Q9 | Ugs [V] | -9.96 | 20 | 50 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | D3 | I Mittel [A] | 2.47 | 5 | 49 %  | Sonne +4 °C (über der Ladeschwelle) |
 | Q8 | Ugs [V] | 9.84 | 20 | 49 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | C13 | U [V] | 12.3 | 25 | 49 %  | Nacht −20 °C, Messung 80 mA + Funk |
@@ -104,7 +104,7 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | Q6 | Uds [V] | 11.9 | 60 | 20 %  | Panel offen −25 °C, Akku voll |
 | U8 | U T_REF2 [V] | 1.67 | 8.61 | 19 %  | Akku 3,8 V (Überladeschutz) |
 | U1 | U CHG_FB [V] | 1.2 | 6.5 | 19 %  | Akku 3,8 V (Überladeschutz) |
-| R1 | P [W] | 0.36 | 2 | 18 %  | Netzteil 13,8 V + Sonne, 20 °C |
+| R1 | P [W] | 0.36 | 2 | 18 %  | Sonne +4 °C (über der Ladeschwelle) |
 | Q10 | Ugs [V] | 3.5 | 20 | 18 %  | Panel offen −25 °C, Akku voll |
 | Q6 | Ugs [V] | 3.44 | 20 | 17 %  | Akku 3,8 V (Überladeschutz) |
 | U10 | U MPPT_EN [V] | 2.84 | 17 | 17 %  | Akku 3,8 V (Überladeschutz) |
@@ -141,10 +141,10 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | R15 | U [V] | 6.13 | 75 | 8 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | R53 | U [V] | 6.13 | 75 | 8 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | Q5 | Uds [V] | 4.26 | 60 | 7 %  | Akku 3,8 V (Überladeschutz) |
-| Q4 | Id [A] | -0.2 | 4 | 5 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
+| Q4 | Id [A] | -0.2 | 4 | 5 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
 | R48 | U [V] | -3.61 | 75 | 5 %  | Akku 3,8 V (Überladeschutz) |
 | R25 | U [V] | -3.6 | 75 | 5 %  | Panel offen −25 °C, Akku voll |
-| R45 | U [V] | -3.39 | 75 | 5 %  | Netzteil 12 V, 20 °C, Akku 30 % |
+| R45 | U [V] | -3.39 | 75 | 5 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | R8 | P [W] | 0.0894 | 2 | 4 %  | Sonne +4 °C (über der Ladeschwelle) |
 | R14 | U [V] | 3.3 | 75 | 4 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | D6 | U Pin 2 [V] | 0.516 | 12 | 4 %  | Akku 3,8 V (Überladeschutz) |
@@ -193,10 +193,10 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | L1 | I DC [A] | 0.00595 | 6.5 | 0 %  | Akku 2,0 V (Tiefentladeschutz) |
 | U2 | U INA_P–INA_M [V] | 0.0299 | 40 | 0 %  | Sonne +4 °C (über der Ladeschwelle) |
 | Q10 | Id [A] | 8.32e-05 | 0.115 | 0 %  | Panel offen −25 °C, Akku voll |
-| R1 | U [V] | 0.12 | 200 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
+| R1 | U [V] | 0.12 | 200 | 0 %  | Sonne +4 °C (über der Ladeschwelle) |
 | Q5 | Id [A] | 6.13e-05 | 0.115 | 0 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | R49 | P [W] | 4.71e-05 | 0.1 | 0 %  | Akku 2,0 V (Tiefentladeschutz) |
-| Q4 | P [W] | 0.000641 | 1.4 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
+| Q4 | P [W] | 0.000641 | 1.4 | 0 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | R2 | P [W] | 2.9e-05 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | D11 | P [W] | 0.000111 | 0.41 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | R18 | P [W] | 2.66e-05 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
@@ -207,7 +207,7 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | R3 | P [W] | 1.45e-05 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | R48 | P [W] | 1.31e-05 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | R25 | P [W] | 1.3e-05 | 0.1 | 0 %  | Panel offen −25 °C, Akku voll |
-| R45 | P [W] | 1.15e-05 | 0.1 | 0 %  | Netzteil 12 V, 20 °C, Akku 30 % |
+| R45 | P [W] | 1.15e-05 | 0.1 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | R21 | P [W] | 6.65e-06 | 0.1 | 0 %  | Panel offen −25 °C, Akku voll |
 | R23 | P [W] | 6.17e-06 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | R9 | U [V] | 0.00369 | 75 | 0 %  | Sonne 20 °C, Akku voll (Konstantspannung) |
@@ -216,7 +216,7 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | D5 | P [W] | 1.42e-05 | 0.5 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
 | R34 | U [V] | -0.00155 | 75 | 0 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | R35 | U [V] | -0.00155 | 75 | 0 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
-| Q9 | Id [A] | -5.63e-05 | 4 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
+| Q9 | Id [A] | -5.63e-05 | 4.4 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
 | R44 | P [W] | 1.25e-06 | 0.1 | 0 %  | Netzteil 12 V, −10 °C |
 | D5 | I [A] | 4.98e-06 | 0.5 | 0 %  | Sonne +45 °C, Akku leer |
 | R22 | P [W] | 7.14e-07 | 0.1 | 0 %  | Panel offen −25 °C, Akku voll |
@@ -231,14 +231,14 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | R37 | U [V] | 0.0001 | 75 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | R9 | P [W] | 4.13e-08 | 0.1 | 0 %  | Sonne 20 °C, Akku voll (Konstantspannung) |
 | Q6 | P [W] | 7.34e-08 | 0.2 | 0 %  | Sonne 20 °C, Akku 30 % (Konstantstrom) |
-| Q1 | P [W] | 2.99e-07 | 2.5 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
+| Q1 | P [W] | 3.17e-07 | 2.5 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
 | Q10 | P [W] | 2.08e-08 | 0.2 | 0 %  | Sonne +1 °C (unter Ladeschwelle: Sperre, Heizung) |
 | D4 | U Sperr [V] | 3.01e-07 | 5 | 0 %  | Akku 2,0 V (Tiefentladeschutz) |
 | Q5 | P [W] | 1.08e-08 | 0.2 | 0 %  | Nacht −20 °C, Messung 80 mA + Funk |
 | Q11 | P [W] | 1.01e-08 | 0.2 | 0 %  | Netzteil 13,8 V + Sonne, 20 °C |
-| Q1 | Id [A] | 1.44e-06 | 40 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
+| Q1 | Id [A] | 1.52e-06 | 40 | 0 %  | Akku 2,8 V, Sondenspitze 200 mA + Funk |
+| Q9 | P [W] | 2.62e-08 | 1.25 | 0 %  | Panel offen −25 °C, Akku voll |
 | R38 | P [W] | 2.06e-09 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
-| Q9 | P [W] | 2.62e-08 | 1.4 | 0 %  | Panel offen −25 °C, Akku voll |
 | R37 | P [W] | 1e-09 | 0.1 | 0 %  | Akku 3,8 V (Überladeschutz) |
 | R34 | P [W] | 5.11e-10 | 0.1 | 0 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
 | R35 | P [W] | 5.11e-10 | 0.1 | 0 %  | Sonde 200 mA, Abschluss gesetzt, Sendebetrieb |
@@ -276,7 +276,7 @@ Größte Auslastung je Bauteil über alle Betriebsfälle. ⚠ ab 80 %, ✗ über
 | Sonne 20 °C, Akku voll (Konstantspannung) | VSYS | 3.61 | 3.5 … 3.66 | ✓ |
 | Sonne −10 °C (Frost: Ladesperre, Heizung) | Ichg | -2.52e-05 | -0.01 … 0.01 | ✓ |
 | Sonne −10 °C (Frost: Ladesperre, Heizung) | Iheat | 0.366 | 0.1 … 1 | ✓ |
-| Sonne +1 °C (unter Ladeschwelle: Sperre, Heizung) | Ichg | -2.48e-05 | -0.01 … 0.01 | ✓ |
+| Sonne +1 °C (unter Ladeschwelle: Sperre, Heizung) | Ichg | -2.52e-05 | -0.01 … 0.01 | ✓ |
 | Sonne +1 °C (unter Ladeschwelle: Sperre, Heizung) | Iheat | 0.354 | 0.1 … 1 | ✓ |
 | Sonne +4 °C (über der Ladeschwelle) | Ichg | 3 | 0.1 … 3.3 | ✓ |
 | Sonne +45 °C, Akku leer | Ichg | 3 | 0.3 … 3.3 | ✓ |

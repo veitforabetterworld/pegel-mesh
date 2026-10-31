@@ -96,22 +96,24 @@ def build_graph(board):
                 link(key, pkey(layer, t.GetEnd()), mm(t.GetWidth()))
     # Flächeninseln
     for zi, z in enumerate(board.Zones()):
-        layer = z.GetLayer()
-        polys = z.GetFilledPolysList(layer)
-        for isl in range(polys.OutlineCount()):
-            zkey = f"zone{zi}.{isl}"
-            for key, ly, pos, net in points:
-                if ly == layer and net == z.GetNetname() and polys.Contains(pos, isl):
-                    link(key, zkey, ZONE_W)
-            for pkey_, pad in pads:
-                if pad.GetNetname() != z.GetNetname() or not pad.IsOnLayer(layer):
-                    continue
-                # Pad hängt an der Fläche, wenn sie das Pad irgendwo überdeckt (Mitte oder Randpunkte)
-                c, sz = pad.GetPosition(), pad.GetBoundingBox()
-                probes = [c] + [pcbnew.VECTOR2I(int(c.x + fx * sz.GetWidth() * 0.4), int(c.y + fy * sz.GetHeight() * 0.4))
-                                for fx, fy in ((-1, 0), (1, 0), (0, -1), (0, 1))]
-                if any(polys.Contains(pt, isl) for pt in probes):
-                    link(pkey_, zkey, ZONE_W)
+        if z.GetIsRuleArea():
+            continue
+        for layer in z.GetLayerSet().Seq():   # Fläche kann auf beiden Lagen liegen
+            polys = z.GetFilledPolysList(layer)
+            for isl in range(polys.OutlineCount()):
+                zkey = f"zone{zi}.{layer}.{isl}"
+                for key, ly, pos, net in points:
+                    if ly == layer and net == z.GetNetname() and polys.Contains(pos, isl):
+                        link(key, zkey, ZONE_W)
+                for pkey_, pad in pads:
+                    if pad.GetNetname() != z.GetNetname() or not pad.IsOnLayer(layer):
+                        continue
+                    # Pad hängt an der Fläche, wenn sie das Pad irgendwo überdeckt (Mitte oder Randpunkte)
+                    c, sz = pad.GetPosition(), pad.GetBoundingBox()
+                    probes = [c] + [pcbnew.VECTOR2I(int(c.x + fx * sz.GetWidth() * 0.4), int(c.y + fy * sz.GetHeight() * 0.4))
+                                    for fx, fy in ((-1, 0), (1, 0), (0, -1), (0, 1))]
+                    if any(polys.Contains(pt, isl) for pt in probes):
+                        link(pkey_, zkey, ZONE_W)
     return adj
 
 

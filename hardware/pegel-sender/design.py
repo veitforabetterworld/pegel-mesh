@@ -50,7 +50,7 @@ g = "solar"
 add("J1", "Connector:Screw_Terminal_01x02", "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",
     "SOLAR", "Phoenix MKDS 1,5/2-5,08 (1715721)", {"1": "SOLAR_RAW", "2": GND}, g)
 add("F1", "Device:Fuse", "Fuse:Fuse_1206_3216Metric", "2A", "Littelfuse 0466002.NR", {"1": "SOLAR_RAW", "2": "SOLAR_F"}, g)
-add("D1", "Device:D_TVS", "Diode_SMD:D_SMB", "SMBJ26A", "SMBJ26A", {"1": "SOLAR_F", "2": GND}, g)
+add("D1", "Device:D_TVS", "Diode_SMD:D_SMB", "SMBJ28A", "SMBJ28A", {"1": "SOLAR_F", "2": GND}, g)
 add("D2", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS34", "SS34 (40 V 3 A)", {"1": "VSOL", "2": "SOLAR_F"}, g)
 
 # 12-V-Netzteil, mit Solar diodenverodert. Die höhere Quelle speist VSOL.
@@ -105,7 +105,7 @@ add("D11", "Device:D_Zener", "Diode_SMD:D_SOD-123", "10V", "BZT52C10", {"1": "MP
 add("Q8", "Device:Q_NMOS", "Package_TO_SOT_SMD:SOT-23", "2N7002", "2N7002",
     {"1": "MPPT_NG", "2": GND, "3": "MPPT_PD"}, g)
 r("R51", "10k", "MPPT_GATE", "MPPT_PD", group=g)
-add("Q9", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "AO3401A", "AOS AO3401A",
+add("Q9", "Device:Q_PMOS", "Package_TO_SOT_SMD:SOT-23", "SI2319CDS", "Vishay Si2319CDS (40 V, ±20 V)",
     {"1": "MPPT_GATE", "2": "VSOL", "3": "MPPT_PULL"}, g)
 r("R46", "100k", "VSOL", "MPPT_GATE", group=g)
 add("D10", "Device:D_Zener", "Diode_SMD:D_SOD-123", "10V", "BZT52C10", {"1": "VSOL", "2": "MPPT_GATE"}, g)
@@ -199,7 +199,7 @@ add("JP1", "Jumper:SolderJumper_2_Open", "Jumper:SolderJumper-2_P1.3mm_Open_Roun
 r("R19", "120", "RS485_TERM", "RS485_B", R0805, "RES 120R 1% 0805", g)
 add("D6", "Diode:SM712_SOT23", "Package_TO_SOT_SMD:SOT-23", "SM712", "Semtech SM712.TCT",
     {"1": "RS485_A", "2": "RS485_B", "3": GND}, g)
-add("D12", "Device:D_TVS", "Diode_SMD:D_SMA", "SMAJ15A", "SMAJ15A", {"1": "V12_PROBE", "2": GND}, "12v")
+add("D12", "Device:D_TVS", "Diode_SMD:D_SMA", "SMAJ18A", "SMAJ18A", {"1": "V12_PROBE", "2": GND}, "12v")
 add("J3", "Connector:Screw_Terminal_01x04", "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",
     "SONDE V+ V- A B", "Phoenix MKDS 1,5/4-5,08 (1715747)",
     {"1": "V12_PROBE", "2": GND, "3": "RS485_A", "4": "RS485_B"}, g)

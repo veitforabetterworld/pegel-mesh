@@ -12,9 +12,9 @@ SPICE_MODELS = """
 .model ZEN10 D(IS=1n RS=4 N=1 BV=10 IBV=5m)
 .model ZEN5V6 D(IS=1n RS=10 N=1 BV=5.6 IBV=5m)
 .model ZEN12 D(IS=1n RS=6 N=1 BV=12 IBV=5m)
-.model TVS26 D(IS=1p RS=0.8 N=1 BV=29.5 IBV=1m)
+.model TVS28 D(IS=1p RS=0.8 N=1 BV=32.7 IBV=1m)
 .model TVS18 D(IS=1p RS=0.45 N=1 BV=21 IBV=1m)
-.model TVS15 D(IS=1p RS=0.45 N=1 BV=17.5 IBV=1m)
+.model TVS18A D(IS=1p RS=0.6 N=1 BV=21 IBV=1m)
 .model TVS13 D(IS=1p RS=1 N=1 BV=13.8 IBV=1m)
 .model TVS7 D(IS=1p RS=1 N=1 BV=7.8 IBV=1m)
 .model LEDRED D(IS=1e-19 N=1.9 RS=8)
@@ -23,15 +23,16 @@ SPICE_MODELS = """
 .model NSI2318 NMOS(LEVEL=1 VTO=1.5 KP=8 LAMBDA=0.01)
 .model NFS8205 NMOS(LEVEL=1 VTO=0.8 KP=25 LAMBDA=0.01)
 .model PAO3401 PMOS(LEVEL=1 VTO=-0.9 KP=12 LAMBDA=0.01)
+.model PSI2319 PMOS(LEVEL=1 VTO=-1.6 KP=8 LAMBDA=0.01)
 .model PAOD4189 PMOS(LEVEL=1 VTO=-2.2 KP=20 LAMBDA=0.01)
 .model SWHY SW(VT=0 VH=0.005 RON=1 ROFF=1e10)
 """
 
 DIODE_MODEL = {
     "SS34": "SS34", "B540C": "B540C", "MBR0540": "MBR0540", "10V": "ZEN10", "12V": "ZEN12",
-    "SMBJ26A": "TVS26", "5V6": "ZEN5V6", "SMBJ18A": "TVS18", "SMAJ15A": "TVS15", "rot": "LEDRED",
+    "SMBJ28A": "TVS28", "5V6": "ZEN5V6", "SMBJ18A": "TVS18", "SMAJ18A": "TVS18A", "rot": "LEDRED",
 }
-MOS_MODEL = {"2N7002": "N2N7002", "SI2318CDS": "NSI2318", "AO3401A": "PAO3401", "AOD4189": "PAOD4189"}
+MOS_MODEL = {"2N7002": "N2N7002", "SI2318CDS": "NSI2318", "AO3401A": "PAO3401", "SI2319CDS": "PSI2319", "AOD4189": "PAOD4189"}
 
 # ---------------------------------------------------------------- Grenzwerte
 # Zweipole: V (Spannung), I (Strom), P (Leistung). MOSFET: Vds, Vgs, Id, P. Diode: Vr, If, P.
@@ -47,15 +48,16 @@ RATINGS = {
     "BZT52C10": {"P": 0.41},
     "BZT52C5V6": {"P": 0.41},
     "BZT52C12": {"P": 0.41},
-    "SMBJ26A": {"Vwm": 26},
+    "SMBJ28A": {"Vwm": 28},
     "SMBJ18A": {"Vwm": 18},
-    "SMAJ15A": {"Vwm": 15},
+    "SMAJ18A": {"Vwm": 18},
     "SM712": {"Vwm+": 12, "Vwm-": -7},
     "LED": {"If": 0.020, "Vr": 5},
     # MOSFETs
     "2N7002": {"Vds": 60, "Vgs": 20, "Id": 0.115, "P": 0.2},
     "AO3401A": {"Vds": 30, "Vgs": 12, "Id": 4.0, "P": 1.4},
     "AOD4189": {"Vds": 40, "Vgs": 20, "Id": 40, "P": 2.5},
+    "SI2319CDS": {"Vds": 40, "Vgs": 20, "Id": 4.4, "P": 1.25},
     "SI2318CDS": {"Vds": 40, "Vgs": 20, "Id": 3.5, "P": 1.0},
     "FS8205A": {"Vds": 20, "Vgs": 12, "Id": 6.0, "P": 1.0},
     # Spulen (Irms Dauerstrom, Isat Sättigung) ≈ Herstellerangaben

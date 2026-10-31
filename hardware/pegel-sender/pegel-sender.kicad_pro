@@ -354,7 +354,7 @@
     "netclass_patterns": [
       {
         "netclass": "Power3A",
-        "pattern": "SOLAR_RAW"
+        "pattern": "HEAT_N"
       },
       {
         "netclass": "Power3A",
@@ -366,11 +366,7 @@
       },
       {
         "netclass": "Power3A",
-        "pattern": "HEAT_N"
-      },
-      {
-        "netclass": "Power3A",
-        "pattern": "CHG_SW"
+        "pattern": "DC_F"
       },
       {
         "netclass": "Power3A",
@@ -378,7 +374,15 @@
       },
       {
         "netclass": "Power3A",
-        "pattern": "DC_F"
+        "pattern": "SOLAR_RAW"
+      },
+      {
+        "netclass": "Power3A",
+        "pattern": "CHG_SW"
+      },
+      {
+        "netclass": "Power1A",
+        "pattern": "VSOL"
       },
       {
         "netclass": "Power1A",
@@ -389,8 +393,8 @@
         "pattern": "BST_SW"
       },
       {
-        "netclass": "Power1A",
-        "pattern": "VSOL"
+        "netclass": "Power",
+        "pattern": "V12_PROBE"
       },
       {
         "netclass": "Power",
@@ -398,15 +402,11 @@
       },
       {
         "netclass": "Power",
-        "pattern": "V12_PROBE"
+        "pattern": "BAT_N"
       },
       {
         "netclass": "Power",
         "pattern": "HEAT_PU"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "BAT_N"
       },
       {
         "netclass": "Power",

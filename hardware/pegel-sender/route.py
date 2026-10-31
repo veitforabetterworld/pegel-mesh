@@ -917,8 +917,9 @@ def preroute(board):
             board.Add(v)
 
 
-# Unterseite ohne Bahnen (Vias erlaubt), damit die GND-Fläche dort zusammenhängt: Rückstrom der Schutz-FETs
-KEEPOUT_B = [(22.6, 48.6, 25.0, 58.4)]
+# Unterseite ohne Bahnen (Vias erlaubt), damit die GND-Fläche dort zusammenhängt: Rückstrom der Schutz-FETs.
+# Der Streifen bis zum Rand verhindert, dass Signalbahnen die Insel unter Q2/Q3 ringsum einschließen.
+KEEPOUT_B = [(22.6, 48.6, 25.0, 58.4), (22.6, 58.4, 25.0, 69.5)]
 
 
 def keepouts(board):

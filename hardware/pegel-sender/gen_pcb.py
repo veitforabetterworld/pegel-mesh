@@ -165,13 +165,13 @@ def field_ok(box, pads, holes, taken, bodies):
     return True
 
 
-def place_field_text(text, starts, pads, holes, taken, bodies):
+def place_field_text(text, starts, pads, holes, taken, bodies, angle=0):
     """Text knapp neben Startpunkt oder Footprint — kein Spiral-Wandern über die Platine."""
     if not isinstance(starts, list):
         starts = [starts]
     for x0, y0 in starts:
         for dx, dy in ((0, 0), (0.55, 0), (-0.55, 0), (0, 0.55), (0, -0.55), (1.1, 0), (0, 1.1)):
-            _set_text_angle(text, 0)
+            _set_text_angle(text, angle)
             text.SetPosition(pos(x0 + dx, y0 + dy))
             box = item_box(text)
             if field_ok(box, pads, holes, taken, bodies):
@@ -230,12 +230,12 @@ def shove_text(text, start, pads, holes, taken, bodies=(), max_radius=13.0):
     return False
 
 
-# (Text, x, y, Höhe mm, Ausrichtung wie label(): 0 Mitte, -1 links, 1 rechts)
+# (Text, x, y, Höhe mm, Ausrichtung wie label(): 0 Mitte, -1 links, 1 rechts[, Winkel])
 BOARD_LABELS = [
     ("SOLAR max 25V", 14.5, 15.0, 0.85, -1),
     ("12V min 1,5A", 14.5, 34.0, 0.8, -1),
     ("AKKU LiFePO4 3,2V", 14.5, 53.0, 0.75, -1),
-    ("SONDE 12V RS485", 84.5, 50.0, 0.7, 1),
+    ("SONDE 12V RS485", 79.8, 45.6, 0.75, 0, 90),   # senkrecht links neben den J3-Pin-Texten
     ("XIAO + Wio-SX1262", 74.0, 3.4, 0.75, 0),
     ("USB ->", 88.0, 5.2, 0.7, 0),
     ("pegel-sender v1", 20.0, 68.4, 0.8, 0),
@@ -274,9 +274,9 @@ def layout_silk(board):
                 pads.append(item_box(gi))
     bodies = component_bodies(board)
     taken = []
-    for text, x, y, size, align in BOARD_LABELS:
+    for text, x, y, size, align, *angle in BOARD_LABELS:
         t = label(board, text, x, y, size, align)
-        if not place_field_text(t, (x, y), pads, holes, taken, bodies):
+        if not place_field_text(t, (x, y), pads, holes, taken, bodies, *angle):
             shove_text(t, (x, y), pads, holes, taken, bodies, max_radius=3.5)
     for fp in board.GetFootprints():
         if not fp.Reference().IsVisible():
@@ -393,6 +393,7 @@ VALUE_FIELDS = {
 REF_FIELDS = {
     "R16": (71.2, 52.4, 0.55, 0),
     "J6": (82.8, 26.2, 0.55, 0),
+    "R27": (30.9, 44.3, 0.6, 0),
 }
 
 
@@ -409,7 +410,7 @@ def pin_labels(board, fps, pads=None, holes=None, taken=None, bodies=None):
                 continue
             y = pcbnew.ToMM(pad.GetPosition().y) - ORIGIN[1]
             if ref == "J3":
-                anchor = l - 2.4
+                anchor = l - 1.4
             else:
                 anchor = r + 1.2 if right_side else l - 1.2
             align = -1 if right_side else 1

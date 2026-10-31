@@ -60,10 +60,13 @@ durch die Heizung (NTC sieht die Lufttemperatur); in echt gibt die Ladesperre an
 
 Knapp, aber innerhalb der Grenzen (≥ 80 %):
 
-- **D1 (SMBJ26A am Panel) 97 % der Sperrspannung** bei −25 °C Leerlauf (25,3 V). Leckstrom steigt nahe Vwm, Durchbruch erst ab 28,9 V. Ein größerer TVS würde im Ernstfall über die 33 V des CN3795 klemmen.
-- **Q9 83 %** (Uds −25 V von 30 V, Ugs −10 V von 12 V; D10 begrenzt).
-- **D12 (SMAJ15A an der Sonde) 82 %** bei 12,3 V.
+- **D1 (SMBJ28A am Panel) 90 % der Sperrspannung** bei −25 °C Leerlauf (25,3 V). Durchbruch ab 31,1 V
+  (bei −25 °C etwa 29,5 V), also 15 % Abstand. Größer geht nicht: SMBJ30A bricht erst ab 33,3 V durch,
+  über den 33 V des CN3795.
 - Logikpegel 3,3 V an XIAO-Pins (85–92 % der Absolutgrenze, das ist Normalbetrieb).
+
+Größer ausgelegt (vorher knapp): Q9 AO3401A → Si2319CDS (40 V, ±20 V; jetzt Uds 62 %, Ugs 50 %),
+D12 SMAJ15A → SMAJ18A (jetzt 68 % bei 12,3 V), D1 SMBJ26A → SMBJ28A (vorher 97 %).
 
 Bei der Prüfung gefundene und behobene Fehler:
 
@@ -73,7 +76,9 @@ Bei der Prüfung gefundene und behobene Fehler:
 4. D8 sah ohne Netzteil Sperrstrom-Spannung über Vwm. Abhilfe: R41 zieht DC_F herunter.
 5. Frostschwellen neu gelegt (R21–R26, R48), siehe oben.
 6. Der 12-V-Wandler TPS61040 schaffte nur ~35 mA. Ersetzt durch LM2735 mit 4,7-µH-SRN6045TA: 200 mA auch bei 2,8 V Zelle.
-7. Platine: L1→R1→R8 (3 A) lief über 0,3–0,6-mm-Bahnen, D3 hatte keine Via zur Massefläche, die Masse der Schutz-FETs hing an einer Insel. Abhilfe: feste 1,2-mm-Bahnen, Vias 0,6 mm, Sperrfläche für Signalbahnen unter den FETs. Alle Pfade jetzt über IPC-2221.
+7. Platine: L1→R1→R8 (3 A) lief über 0,3–0,6-mm-Bahnen, D3 hatte keine Via zur Massefläche, die Masse der Schutz-FETs hing an einer Insel. Abhilfe: feste 1,2-mm-Bahnen, Vias 0,6 mm, Sperrfläche für Signalbahnen unter den FETs, als Streifen bis zum
+   Platinenrand (sonst schließen Signalbahnen die Masseinsel je nach Routing-Lauf ringsum ein). Alle Pfade jetzt über IPC-2221.
+   `pcb_check.py` wertet Flächen auf allen ihren Lagen aus.
 
 Grenzen der Simulation: Verhaltensmodelle bilden keine Regelschleifen-Stabilität, keine EMV und keine
 Bauteiltoleranzen ab. Der Einschaltstrom der Sonde ist nur so groß wie ihr Modell (keine Eingangskapazität
