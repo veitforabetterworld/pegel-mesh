@@ -33,9 +33,14 @@ ROTATION_FIX = [
     (r"^SOT-89", 180),
     (r"^SOIC-", 270),
 ]
+# Einzelne LCSC-Teile, deren JLC-Modell vom Gehäuse-Standard abweicht (Korrektur ersetzt ROTATION_FIX).
+# B0540W (C7420325): Kathode des Modells auf der Gegenseite der übrigen SOD-123.
+LCSC_ROTATION_FIX = {"C7420325": 180}
 
 
-def jlc_rotation(footprint: str, rot: float) -> float:
+def jlc_rotation(footprint: str, rot: float, lcsc: str = "") -> float:
+    if lcsc in LCSC_ROTATION_FIX:
+        return (rot + LCSC_ROTATION_FIX[lcsc]) % 360
     for pattern, fix in ROTATION_FIX:
         if re.match(pattern, footprint):
             return (rot + fix) % 360
@@ -70,7 +75,8 @@ def main():
         for row in csv.DictReader(f):
             if row["Ref"] not in assembled:
                 continue
-            rot = jlc_rotation(assembled[row["Ref"]].footprint.split(":")[1], float(row["Rot"]))
+            part = assembled[row["Ref"]]
+            rot = jlc_rotation(part.footprint.split(":")[1], float(row["Rot"]), part.lcsc)
             w.writerow([row["Ref"], f'{float(row["PosX"]):.3f}mm', f'{float(row["PosY"]):.3f}mm',
                         "Top" if row["Side"] == "top" else "Bottom", f"{rot:g}"])
     os.remove(pos)
