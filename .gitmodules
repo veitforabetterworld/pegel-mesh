@@ -1,3 +1,6 @@
 [submodule "MeshCore"]
 	path = MeshCore
 	url = https://github.com/meshcore-dev/MeshCore.git
+[submodule "MeshCore-nrf54"]
+	path = MeshCore-nrf54
+	url = https://github.com/meshcore-dev/MeshCore.git

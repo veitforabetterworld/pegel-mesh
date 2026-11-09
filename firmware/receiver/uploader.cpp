@@ -9,6 +9,7 @@
 
 #include "secrets_receiver.h"
 #include "receiver_wifi.h"
+#include "tracker_uplink.h"
 
 #define QUEUE_LEN        1024   // reicht für ~17 h von Sender A ohne Verbindung
 #define BATCH_MAX        60
@@ -47,8 +48,7 @@ void uploader_status(char* buf, int len) {
            (unsigned long)dropped, last_http);
 }
 
-static int request(const char* method, const String& path, const String& body) {
-  String url = String(PEGEL_API_URL) + path;
+int uploader_http(const char* method, const String& url, const char* api_key, const String& body, String* response) {
   HTTPClient http;
   WiFiClient plain;
   WiFiClientSecure secure;
@@ -61,14 +61,20 @@ static int request(const char* method, const String& path, const String& body) {
   }
   http.setTimeout(15000);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-Key", PEGEL_API_KEY);
+  http.addHeader("X-API-Key", api_key);
   int code = http.sendRequest(method, body);
   if (code < 200 || code >= 300) {
-    Serial.printf("HTTP %s %s -> %d %s\n", method, path.c_str(), code, http.getString().c_str());
+    Serial.printf("HTTP %s %s -> %d %s\n", method, url.c_str(), code, http.getString().c_str());
+  } else if (response) {
+    *response = http.getString();
   }
   http.end();
   last_http = code;
   return code;
+}
+
+static int request(const char* method, const String& path, const String& body) {
+  return uploader_http(method, String(PEGEL_API_URL) + path, PEGEL_API_KEY, body, nullptr);
 }
 
 // Legt die Messstelle privat an (der Key braucht stations.write); 409 = ID schon vergeben, dann besteht sie.
@@ -165,6 +171,8 @@ static void uploaderTask(void*) {
   WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
   configTime(0, 0, "pool.ntp.org", "time.google.com");
   uint32_t next_scan = millis() + 60000;
+  uint32_t pegel_retry_at = 0;
+  bool pegel_on = strlen(PEGEL_API_URL) > 0 && strlen(PEGEL_API_KEY) > 0;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && (int32_t)(millis() - next_scan) >= 0) {
       next_scan = millis() + 60000;
@@ -175,18 +183,21 @@ static void uploaderTask(void*) {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
-    if (queued == 0) {
-      vTaskDelay(pdMS_TO_TICKS(1000));
-      continue;
+    // Tracker zuerst: ein Alarm soll nicht hinter einem Pegel-Rückstau warten.
+    bool busy = tracker_uplink_service();
+    if (pegel_on && queued > 0 && (int32_t)(millis() - pegel_retry_at) >= 0) {
+      if (uploadBatch()) busy = true;
+      else pegel_retry_at = millis() + RETRY_DELAY_MS;
     }
-    if (!uploadBatch()) vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
+    if (!busy) vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
 void uploader_begin() {
   lock = xSemaphoreCreateMutex();
-  if (strlen(PEGEL_WIFI_SSID) == 0 || strlen(PEGEL_API_URL) == 0 || strlen(PEGEL_API_KEY) == 0) {
-    Serial.println("uploader off: WLAN/API in secrets/receiver_wifi.h nicht eingetragen");
+  tracker_uplink_begin();
+  if (strlen(PEGEL_WIFI_SSID) == 0) {
+    Serial.println("uploader off: WLAN in secrets/receiver_wifi.h nicht eingetragen");
     return;
   }
   xTaskCreatePinnedToCore(uploaderTask, "uploader", 8192, nullptr, 1, nullptr, 0);

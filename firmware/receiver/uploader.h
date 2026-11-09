@@ -9,3 +9,8 @@ void uploader_begin();
 void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint8_t age_s, uint16_t level_mm);
 // Kurzer Status für die Statuszeile auf Serial.
 void uploader_status(char* buf, int len);
+
+#include <Arduino.h>
+// HTTP-Aufruf für die Uploader (nur aus dem Uploader-Task). Schickt api_key als X-API-Key; die Antwort landet in
+// response, wenn nicht nullptr. Gibt den HTTP-Status zurück (negativ bei Verbindungsfehlern).
+int uploader_http(const char* method, const String& url, const char* api_key, const String& body, String* response);
