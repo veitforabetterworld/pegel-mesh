@@ -70,3 +70,27 @@ python3 tools/pio.py run -e pegel_sender_a -t upload --upload-port /dev/ttyACM0
 | `pegel_receiver` | Empfänger, XIAO ESP32-S3 + Wio-SX1262 |
 
 Immer `tools/pio.py` statt `pio` aufrufen; es hängt `pegel.ini` in das MeshCore-Submodul ein.
+
+## GPS-Tracker
+
+Der Empfänger ist zugleich Gateway für GPS-Tracker: XIAO nRF54LM20A Sense + Wio-SX1262 + L76K-GNSS-Modul (Seeed 109100021). Der Tracker schläft zwischen den Ortungen in System OFF, meldet Position und Akkustand verschlüsselt über MeshCore, speichert nicht quittierte Meldungen zwischen und reicht sie nach. Bei eingeschaltetem Bewegungsalarm weckt ihn der Bewegungssensor. Der Empfänger lädt die Meldungen zu [tracker.plenivo.de](https://tracker.plenivo.de) hoch und gibt dem Tracker dessen Einstellungen (Intervall, Alarm) mit. Firmware in [`firmware/tracker/`](firmware/tracker/), Paketformat in [`firmware/common/tracker_packet.h`](firmware/common/tracker_packet.h).
+
+Schlüssel für einen neuen Tracker (hier `T1`), danach den Empfänger neu flashen:
+
+```bash
+python3 tools/genkeys.py --tracker T1
+```
+
+In `secrets/receiver_wifi.h` `TRACKER_API_URL` (`https://tracker.plenivo.de/api`) und je Tracker den API-Key aus dem Tracker-Dialog der Webseite eintragen. Ohne URL gibt der Empfänger die Meldungen nur auf Serial aus; Einstellungen lassen sich dann mit `tset <tracker> <intervall 0..3> <alarm 0..3> <alarmintervall 0..3>` auf Serial setzen.
+
+Der nRF54LM20A wird von MeshCore noch nicht offiziell unterstützt; der Tracker baut gegen das Submodul `MeshCore-nrf54` (MeshCore-PR #3530). `tools/pio.py` wählt es für alle Umgebungen `tracker_*` und hängt `tracker.ini` ein.
+
+```bash
+python3 tools/pio.py run -e tracker_t1 -t upload
+```
+
+Ein neues Board ist ab Werk gesperrt (APPROTECT): einmal mit OpenOCD über den CTRL-AP löschen und dann `-t bootloader` (Bootloader, SoftDevice, Firmware) flashen; danach reicht `-t upload`. Die USB-Seriell-Brücke des Boards bleibt nach System OFF oft hängen; das Log liegt deshalb zusätzlich im RAM und lässt sich per SWD lesen (weckt den Tracker dabei auf):
+
+```bash
+bash tools/tracker_log.sh
+```

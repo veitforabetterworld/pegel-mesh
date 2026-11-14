@@ -9,6 +9,7 @@ werden); --force erzwingt das.
 
     py -3.12 tools/genkeys.py            # Sender A und B
     py -3.12 tools/genkeys.py A B C      # weitere Sender
+    py -3.12 tools/genkeys.py --tracker T1   # GPS-Tracker (nur Identität; die Pakete verschlüsselt MeshCore)
 """
 
 import argparse
@@ -48,6 +49,7 @@ def c_bytes(hex_str):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("senders", nargs="*", default=["A", "B"])
+    ap.add_argument("--tracker", action="append", default=[], metavar="NAME")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
 
@@ -61,12 +63,36 @@ def main():
             ident = new_identity()
             ident["hmac"] = os.urandom(32).hex()
             keys["senders"][name] = ident
+    trackers = keys.setdefault("trackers", {})
+    for name in args.tracker:
+        if name not in trackers:
+            trackers[name] = new_identity()
     KEYS_JSON.write_text(json.dumps(keys, indent=2), encoding="utf-8")
 
     senders = keys["senders"]
     names = list(senders)
+    tnames = list(trackers)
     rx = keys["receiver"]
     header = "#pragma once\n// Erzeugt von tools/genkeys.py -- NICHT einchecken.\n\n"
+
+    for name, t in trackers.items():
+        (SECRETS / f"secrets_tracker_{name.lower()}.h").write_text(
+            header
+            + f'#define TRACKER_NAME          "{name}"\n'
+            + f'#define TRACKER_PRV           "{t["prv"]}"\n'
+            + f'#define TRACKER_PUB           "{t["pub"]}"\n'
+            + f'#define TRACKER_RECEIVER_PUB  "{rx["pub"]}"\n',
+            encoding="utf-8",
+        )
+
+    tracker_block = f"\n#define TRACKER_COUNT  {len(tnames)}\n"
+    if tnames:
+        tracker_block += (
+            "static const char* const TRACKER_NAMES[TRACKER_COUNT] = { "
+            + ", ".join(f'"{n}"' for n in tnames) + " };\n"
+            + "static const char* const TRACKER_PUBS[TRACKER_COUNT] = {\n"
+            + "".join(f'  "{trackers[n]["pub"]}",\n' for n in tnames) + "};\n"
+        )
 
     for name, s in senders.items():
         (SECRETS / f"secrets_sender_{name.lower()}.h").write_text(
@@ -89,7 +115,8 @@ def main():
         + "static const char* const PEGEL_SENDER_PUBS[PEGEL_SENDER_COUNT] = {\n"
         + "".join(f'  "{senders[n]["pub"]}",\n' for n in names) + "};\n"
         + "static const uint8_t PEGEL_HMAC_KEYS[PEGEL_SENDER_COUNT][32] = {\n"
-        + "".join(f"  {c_bytes(senders[n]['hmac'])},\n" for n in names) + "};\n",
+        + "".join(f"  {c_bytes(senders[n]['hmac'])},\n" for n in names) + "};\n"
+        + tracker_block,
         encoding="utf-8",
     )
 
@@ -109,13 +136,22 @@ def main():
             + f"static const char* const PEGEL_STATION_IDS[PEGEL_SENDER_COUNT] = {{ {ids} }};\n"
             + f"static const char* const PEGEL_STATION_NAMES[PEGEL_SENDER_COUNT] = {{ {labels} }};\n"
             + f"static const float PEGEL_STATION_LAT[PEGEL_SENDER_COUNT] = {{ {zeros} }};\n"
-            + f"static const float PEGEL_STATION_LON[PEGEL_SENDER_COUNT] = {{ {zeros} }};\n",
+            + f"static const float PEGEL_STATION_LON[PEGEL_SENDER_COUNT] = {{ {zeros} }};\n"
+            + "\n// GPS-Tracker (tracker.plenivo.de). Leer = Meldungen nur auf Serial, Einstellungen per \"tset\" von Hand.\n"
+            + '#define TRACKER_API_URL   ""   // z. B. "https://tracker.plenivo.de/api", ohne / am Ende\n'
+            + "#if TRACKER_COUNT > 0\n"
+            + "// Ein API-Key je Tracker, Reihenfolge wie TRACKER_NAMES in secrets_receiver.h.\n"
+            + "static const char* const TRACKER_API_KEYS[TRACKER_COUNT] = { "
+            + ", ".join('""' for _ in tnames) + " };\n"
+            + "#endif\n",
             encoding="utf-8",
         )
 
     print(f"receiver pub {rx['pub']}")
     for n in names:
         print(f"sender {n}  pub {senders[n]['pub']}")
+    for n in tnames:
+        print(f"tracker {n}  pub {trackers[n]['pub']}")
     print(f"headers in {SECRETS}")
 
 
