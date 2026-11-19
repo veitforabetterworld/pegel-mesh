@@ -5,7 +5,7 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <time.h>
+#include "unix_time.h"
 
 #include "secrets_receiver.h"
 #include "receiver_wifi.h"
@@ -14,13 +14,13 @@
 #define QUEUE_LEN        1024   // reicht für ~17 h von Sender A ohne Verbindung
 #define BATCH_MAX        60
 #define RETRY_DELAY_MS   30000
-#define TIME_VALID_AFTER 1700000000L   // vor NTP-Sync steht die Uhr bei 1970
+#define TIME_VALID_AFTER 1700000000UL   // vor NTP-Sync steht die Uhr bei 1970
 
 struct Pending {
   uint32_t received_ms;
+  uint32_t age_s;
   uint16_t level_mm;
   uint8_t sender;
-  uint8_t age_s;
 };
 
 static Pending queue[QUEUE_LEN];
@@ -30,14 +30,14 @@ static uint32_t uploaded = 0;
 static int last_http = 0;
 static SemaphoreHandle_t lock;
 
-void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint8_t age_s, uint16_t level_mm) {
+void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint32_t age_s, uint16_t level_mm) {
   xSemaphoreTake(lock, portMAX_DELAY);
   if (queued == QUEUE_LEN) {   // voll: ältesten Wert verwerfen
     memmove(&queue[0], &queue[1], sizeof(Pending) * (QUEUE_LEN - 1));
     queued--;
     dropped++;
   }
-  queue[queued++] = { received_ms, level_mm, sender_idx, age_s };
+  queue[queued++] = { received_ms, age_s, level_mm, sender_idx };
   xSemaphoreGive(lock);
 }
 
@@ -91,13 +91,6 @@ static bool createStation(int i) {
   return (code >= 200 && code < 300) || code == 409;
 }
 
-static String isoTime(time_t t) {
-  struct tm tm;
-  gmtime_r(&t, &tm);
-  char buf[24];
-  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
-  return buf;
-}
 
 // Schickt die ältesten Werte eines Senders; true, wenn die Schlange danach weiterverarbeitet werden kann.
 static bool uploadBatch() {
@@ -111,13 +104,13 @@ static bool uploadBatch() {
   xSemaphoreGive(lock);
   if (n == 0) return false;
 
-  time_t now = time(nullptr);
+  uint32_t now = unix_now();
   uint32_t now_ms = millis();
   String body = "{\"observations\":[";
   for (int k = 0; k < n; k++) {
-    time_t measured = now - (time_t)((now_ms - batch[k].received_ms) / 1000) - batch[k].age_s;
+    uint32_t measured = unix_at(now, now_ms, batch[k].received_ms, batch[k].age_s);
     if (k) body += ",";
-    body += "{\"observed_at\":\"" + isoTime(measured) + "\",";
+    body += "{\"observed_at\":\"" + unix_iso(measured) + "\",";
     // Ab PEGEL_STATUS_BASE meldet der Sender einen Fehlercode statt eines Pegels.
     if (batch[k].level_mm >= PEGEL_STATUS_BASE) body += "\"status\":" + String(batch[k].level_mm - PEGEL_STATUS_BASE) + "}";
     else body += "\"water_level\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
@@ -179,7 +172,7 @@ static void uploaderTask(void*) {
       logScan();
       WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
     }
-    if (WiFi.status() != WL_CONNECTED || time(nullptr) < TIME_VALID_AFTER) {
+    if (WiFi.status() != WL_CONNECTED || unix_now() < TIME_VALID_AFTER) {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }

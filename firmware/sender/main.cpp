@@ -1,9 +1,11 @@
 // Pegel-Sender (XIAO nRF52840 + Wio-SX1262)
 //
-// Schickt zyklisch ein 13-Byte-Messpaket (pegel_packet.h) als RAW_CUSTOM-Direktpaket an den
-// Empfänger. RAW_CUSTOM wird von Repeatern nur auf einem bekannten Pfad weitergeleitet, nie
-// geflutet. Den Pfad lernt der Sender über eine geflutete, verschlüsselte REQ an den Empfänger,
-// der mit einem Path-Return antwortet. Stündlich prüft eine direkte REQ, ob der Pfad noch trägt.
+// Misst zyklisch und legt jede Messung in den Stau (backlog.h), bis der Empfänger sie quittiert. Gesendet wird
+// ein Block der neuesten Messungen (pegel_block.h) als REQ, direkt auf dem bekannten Pfad oder ohne Hops,
+// nie geflutet. Im Messtakt geht immer ein Block raus. Kam die Quittung, folgt der restliche Stau Block für
+// Block, solange das 1-%-Sendebudget reicht; bleibt sie aus, wartet der Sender auf den nächsten Messtakt.
+// Den Pfad lernt der Sender über eine geflutete, verschlüsselte REQ an den Empfänger, der mit einem
+// Path-Return antwortet. Stündlich prüft eine direkte REQ, ob der Pfad noch trägt.
 
 #include <Arduino.h>
 #include <Mesh.h>
@@ -14,6 +16,8 @@
 #include <target.h>
 
 #include "pegel_packet.h"
+#include "pegel_block.h"
+#include "backlog.h"
 #include "level_sensor.h"
 #if PEGEL_BOARD
   #include "battery.h"
@@ -35,6 +39,12 @@ using namespace Adafruit_LittleFS_Namespace;
 #define DISCOVER_RETRY_MS       (10UL * 60 * 1000)   // ohne Pfad: Suche alle 10 min wiederholen
 #define DIRECT_REPLY_TIMEOUT_MS 30000
 #define FLOOD_REPLY_TIMEOUT_MS  60000
+#define BLOCK_REPLY_TIMEOUT_MS  30000
+#define BACKLOG_GAP_MS          2000    // Pause zwischen Quittung und nächstem Stau-Block
+#define BACKLOG_BUDGET_WAIT_MS  10000   // Budget reicht nicht: so lange warten, dann neu prüfen
+
+// MeshCore begrenzt die Sendezeit auf 1 / (1 + Faktor) je Stunde: 99 ergibt 1 %.
+#define PEGEL_AIRTIME_FACTOR  99.0f
 
 #define CTR_FILE       "/pegel_ctr"
 #define CTR_SAVE_STEP  256   // Zähler nur alle 256 Pakete in den Flash schreiben
@@ -54,6 +64,8 @@ static void logf(const char* fmt, ...) {
   if (Serial.availableForWrite() < n) return;
   Serial.write((const uint8_t*)buf, n);
 }
+
+static Backlog backlog;
 
 static uint32_t loadCounter() {
   uint32_t c = 0;
@@ -89,6 +101,13 @@ class SenderMesh : public mesh::Mesh {
   bool awaiting_reply = false;
   bool sensor_on = false;
   bool battery_low = false;
+  bool link_ok = false;          // letzter Block wurde quittiert
+  bool block_in_flight = false;
+  uint8_t block_tag[PGB_TAG_LEN];
+  uint32_t block_counter = 0;
+  uint8_t block_n = 0;
+  uint32_t block_deadline = 0;
+  uint32_t next_backlog = 0;
   uint16_t bat_mv = 0;
 
 #if PEGEL_BOARD
@@ -131,33 +150,55 @@ class SenderMesh : public mesh::Mesh {
 #endif
   }
 
-  void transmit(uint8_t status, uint16_t level_mm, uint32_t measured_at) {
-    PegelReading r;
+  // Neue Messung (oder Fehlercode) in den Stau legen. Im Messtakt geht immer ein Block raus, auch wenn der
+  // letzte nicht ankam; nur ein noch unbeantworteter Block hat Vorrang (der nächste trägt die Messung dann mit).
+  void record(uint8_t status, uint16_t level_mm, uint32_t measured_at) {
     if (status != LEVEL_OK) {
       // Statt eines Messwerts geht der Fehlercode über Funk; die Pegelseite zeigt ihn als Gerätestatus.
-      r.level_mm = PEGEL_STATUS_BASE + status;
+      level_mm = PEGEL_STATUS_BASE + status;
       logf("error %u\n", status);
-    } else {
-      r.level_mm = level_mm;
     }
-    r.counter = ++counter;
+    ++counter;
     if (counter % CTR_SAVE_STEP == 0) saveCounter(counter);
-    r.age_s = (uint8_t)min((millis() - measured_at) / 1000UL, 255UL);
-
-    uint8_t buf[PEGEL_PKT_LEN];
-    pegel_encode(PEGEL_HMAC_KEY, r, buf);
-    mesh::Packet* pkt = createRawData(buf, sizeof(buf));
-    if (!pkt) return;
-    // Ohne Pfad als Direktpaket ohne Hops: kommt nur an, wenn der Empfänger in Funkreichweite ist.
-    sendDirect(pkt, out_path, have_path ? out_path_len : 0);
-    logf("TX #%lu level=%u mm %s\n", (unsigned long)r.counter, r.level_mm,
-                  have_path ? "(direct path)" : "(zero hop)");
+    backlog.expire(measured_at);
+    backlog.push(counter, measured_at, level_mm);
+    logf("measured #%lu level=%u mm, backlog %d\n", (unsigned long)counter, level_mm, backlog.size());
+    if (!block_in_flight) sendBlock();
   }
 
   void sendReading() {
     uint32_t measured_at = millis();
     uint16_t level_mm = 0;
-    transmit(measureLevel(level_mm), level_mm, measured_at);
+    record(measureLevel(level_mm), level_mm, measured_at);
+  }
+
+  // Sendezeit eines Blocks mit data_len Byte: Kopf, Pfadlänge, Pfad, Ziel- und Absender-Hash, MAC und die auf
+  // AES-Blöcke aufgerundeten Daten.
+  uint32_t blockAirtime(int data_len) {
+    int path_bytes = have_path ? (out_path_len & 63) * ((out_path_len >> 6) + 1) : 0;
+    int len = 2 + path_bytes + 4 + ((data_len + 15) / 16) * 16;
+    return radio_driver.getEstAirtimeFor(len);
+  }
+
+  void sendBlock() {
+    PegelBlock b;
+    if (backlog.build(millis(), PEGEL_INTERVAL_S, b) == 0) return;
+    getRNG()->random(b.tag, PGB_TAG_LEN);
+    b.batt_mv = bat_mv;
+    uint8_t data[PGB_MAX_LEN];
+    int len = pgb_encode(b, data);
+    mesh::Packet* pkt = createDatagram(PAYLOAD_TYPE_REQ, receiver, secret, data, len);
+    if (!pkt) return;
+    // Ohne Pfad ohne Hops: kommt nur an, wenn der Empfänger in Funkreichweite ist.
+    if (have_path) sendDirect(pkt, out_path, out_path_len);
+    else sendZeroHop(pkt);
+    memcpy(block_tag, b.tag, PGB_TAG_LEN);
+    block_counter = b.counter;
+    block_n = b.n;
+    block_in_flight = true;
+    block_deadline = millis() + BLOCK_REPLY_TIMEOUT_MS;
+    logf("TX block #%lu..#%lu %s\n", (unsigned long)(b.counter - b.n + 1), (unsigned long)b.counter,
+         have_path ? "(direct path)" : "(zero hop)");
   }
 
   void sendRequest() {
@@ -199,11 +240,23 @@ protected:
 
   void onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender_idx, const uint8_t* secret,
                       uint8_t* data, size_t len) override {
-    if (type == PAYLOAD_TYPE_RESPONSE) {
-      awaiting_reply = false;
-      logf("receiver answered, path ok\n");
+    if (type != PAYLOAD_TYPE_RESPONSE) return;
+    if (block_in_flight && pgb_is_ack(data, (int)len, block_tag)) {
+      backlog.remove(block_counter, block_n);
+      block_in_flight = false;
+      link_ok = true;
+      uint32_t now = millis();
+      next_backlog = now + BACKLOG_GAP_MS;
+      if (have_path && !awaiting_reply) next_check = now + PATH_CHECK_INTERVAL_MS;   // die Quittung belegt den Pfad
+      logf("ack #%lu..#%lu, backlog %d\n", (unsigned long)(block_counter - block_n + 1), (unsigned long)block_counter,
+           backlog.size());
+      return;
     }
+    awaiting_reply = false;
+    logf("receiver answered, path ok\n");
   }
+
+  float getAirtimeBudgetFactor() const override { return PEGEL_AIRTIME_FACTOR; }
 
 public:
   SenderMesh(mesh::Radio& radio, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
@@ -264,7 +317,7 @@ public:
         level_sensor_power(false);
         sensor_on = false;
 #endif
-        transmit(LEVEL_BATTERY_LOW, 0, now);
+        record(LEVEL_BATTERY_LOW, 0, now);
         next_send += PEGEL_INTERVAL_S * 1000UL;
       }
 #if PEGEL_SENSOR
@@ -281,13 +334,36 @@ public:
         next_send += PEGEL_INTERVAL_S * 1000UL;
       }
     }
+    if (block_in_flight && due(now, block_deadline)) {
+      block_in_flight = false;
+      link_ok = false;
+      logf("no ack, backlog %d\n", backlog.size());
+      // Vielleicht trägt der Pfad nicht mehr: gleich prüfen statt erst zur vollen Stunde.
+      if (have_path && !awaiting_reply) next_check = now;
+    }
+    // Stau nachsenden, solange die Verbindung steht und das Budget den Block und danach noch zwei reguläre
+    // Messungen trägt.
+    if (link_ok && !block_in_flight && backlog.size() > 0 && due(now, next_backlog)) {
+      PegelBlock b;
+      int n = backlog.build(now, PEGEL_INTERVAL_S, b);
+      uint32_t need = blockAirtime(PGB_HEAD_LEN + 2 * n) + 2 * blockAirtime(PGB_HEAD_LEN + 2);
+      if (getRemainingTxBudget() >= need) sendBlock();
+      else next_backlog = now + BACKLOG_BUDGET_WAIT_MS;
+    }
     if (due(now, next_status)) {
       next_status = now + 30000;
-      logf("status: up %lus counter=%lu path=%s bat=%umV\n", (unsigned long)(now / 1000), (unsigned long)counter,
-                    have_path ? "yes" : "no", bat_mv);
+      logf("status: up %lus counter=%lu path=%s bat=%umV backlog=%d dropped=%lu budget=%lums\n",
+           (unsigned long)(now / 1000), (unsigned long)counter, have_path ? "yes" : "no", bat_mv, backlog.size(),
+           (unsigned long)backlog.dropped, (unsigned long)getRemainingTxBudget());
     }
   }
 };
+
+// Wie radio_init() der Variante, aber ohne rtc_clock.begin(Wire): I²C liegt beim XIAO auf D6/D7, dort hängt
+// RS485. Bei ausgeschalteter Sonde zieht der unversorgte SP3485 RX auf GND, die RTC-Suche hängt dann für immer.
+// Der Sender braucht keine RTC; rtc_clock nutzt ohne begin() die interne Uhr.
+extern RADIO_CLASS radio;
+static bool sender_radio_init() { return radio.std_init(&SPI); }
 
 StdRNG fast_rng;
 SimpleMeshTables tables;
@@ -296,7 +372,7 @@ SenderMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables);
 void setup() {
   Serial.begin(115200);
   board.begin();
-  if (!radio_init()) {
+  if (!sender_radio_init()) {
     while (1) { logf("radio init failed\n"); delay(2000); }
   }
   fast_rng.begin(radio_driver.getRngSeed());

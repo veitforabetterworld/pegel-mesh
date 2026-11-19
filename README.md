@@ -71,6 +71,26 @@ python3 tools/pio.py run -e pegel_sender_a -t upload --upload-port /dev/ttyACM0
 
 Immer `tools/pio.py` statt `pio` aufrufen; es hängt `pegel.ini` in das MeshCore-Submodul ein.
 
+## Funkausfall und Nachsenden
+
+Der Sender hält jede Messung im RAM, bis der Empfänger sie quittiert: 6144 Messungen, bei Sender A gut 4 Tage, bei Sender B gut 3 Wochen. Ist der Puffer voll, fällt die älteste Messung heraus; nach 30 Tagen verfällt eine Messung ebenfalls. Ein Neustart des Senders (Update, Tiefentladung) verwirft den Puffer.
+
+- Im Messtakt geht immer ein Block mit den neuesten Messungen raus (bis 75 je Paket). Bleibt die Quittung aus, versucht es der Sender erst im nächsten Messtakt wieder.
+- Kam die Quittung, folgt der restliche Stau Block für Block, neueste zuerst, solange das Sendebudget von 1 % je Stunde reicht (MeshCore setzt es durch). Ein Tag Ausfall von Sender A ist so in knapp einer Stunde nachgeholt.
+- Daten und Quittungen laufen nur auf dem bekannten Pfad oder ohne Hops, nie geflutet.
+
+Nach einem Tausch oder Neuaufsetzen eines Senders fängt sein Zähler wieder klein an; der Empfänger lehnt dessen Messungen dann als veraltet ab. Abhilfe: am Empfänger über USB-Serial `creset <Sender>` eingeben, z. B. `creset A`.
+
+## Langzeitbetrieb (Zeitgrenzen)
+
+| Gerät | Grenze | Grund |
+|---|---|---|
+| Sender | keine | kennt keine Uhrzeit, nur Abstände (über den `millis()`-Überlauf alle 49,7 Tage hinweg gerechnet); der 32-Bit-Zähler reicht bei einer Messung je Minute rund 8000 Jahre |
+| Empfänger | **Februar 2104** | Zeit per SNTP: das NTP-Protokoll zählt in 136-Jahre-Epochen, lwIP (ESP-IDF) deutet die Zeitstempel nur für 1968–2104 richtig |
+| Empfänger | 7. Februar 2106 | ESP-IDF 4.4 (Arduino-ESP32 2.x) hat 32-Bit-`time_t` und setzt die Systemzeit als `uint32`; die Firmware liest sie vorzeichenlos (`receiver/unix_time.h`), dadurch hält sie über 2038 hinaus bis 2106 |
+
+Die Hardware (ESP32-S3, nRF52840) setzt keine Grenze; es ist nur die Software des Empfängers. Danach hält der Empfänger die Uhr für ungültig und lädt nichts mehr hoch (keine falschen Zeitstempel). Abhilfe per Firmware-Update des Empfängers vor 2104: Uhrzeit nicht per SNTP, sondern aus dem `Date`-Header der API-Antworten holen und als 64-Bit-Sekunden plus `millis()` selbst führen, oder auf ein ESP-IDF mit 64-Bit-`time_t` und angepasster SNTP-Epoche wechseln. Der Server (Postgres, Node.js) rechnet weit über 2106 hinaus.
+
 ## GPS-Tracker
 
 Der Empfänger ist zugleich Gateway für GPS-Tracker: XIAO nRF54LM20A Sense + Wio-SX1262 + L76K-GNSS-Modul (Seeed 109100021). Der Tracker schläft zwischen den Ortungen in System OFF, meldet Position und Akkustand verschlüsselt über MeshCore, speichert nicht quittierte Meldungen zwischen und reicht sie nach. Bei eingeschaltetem Bewegungsalarm weckt ihn der Bewegungssensor. Der Empfänger lädt die Meldungen zu [tracker.plenivo.de](https://tracker.plenivo.de) hoch und gibt dem Tracker dessen Einstellungen (Intervall, Alarm) mit. Firmware in [`firmware/tracker/`](firmware/tracker/), Paketformat in [`firmware/common/tracker_packet.h`](firmware/common/tracker_packet.h).

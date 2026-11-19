@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#include <time.h>
+#include "unix_time.h"
 
 #include "secrets_receiver.h"
 #include "receiver_wifi.h"
@@ -91,13 +91,6 @@ void tracker_uplink_status(char* buf, int len) {
 
 #if TRACKER_UPLINK
 
-static String isoTime(time_t t) {
-  struct tm tm;
-  gmtime_r(&t, &tm);
-  char buf[24];
-  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
-  return buf;
-}
 
 // Liest eine ganze Zahl hinter "name": aus dem settings-Objekt der Antwort.
 static bool jsonInt(const String& body, int from, const char* name, long& out) {
@@ -117,6 +110,10 @@ static void applyResponse(uint8_t idx, const String& body) {
   if (!jsonInt(body, s, "version", version) || !jsonInt(body, s, "interval_s", iv) ||
       !jsonInt(body, s, "alarm_level", alarm) || !jsonInt(body, s, "alarm_interval_s", alarm_iv)) {
     Serial.printf("tracker %s: settings unreadable\n", TRACKER_NAMES[idx]);
+    return;
+  }
+  if (version < 0 || version > 0xFFFF || alarm < 0 || alarm > 0xFF || iv < 0 || alarm_iv < 0) {
+    Serial.printf("tracker %s: settings out of range\n", TRACKER_NAMES[idx]);
     return;
   }
   TrackerSettings t;
@@ -145,15 +142,14 @@ static bool uploadBatch() {
   const char* api_key = TRACKER_API_KEYS[idx];
   bool no_key = strlen(api_key) == 0;   // ohne Key: verwerfen statt ewig stauen
   if (!no_key) {
-    time_t now = time(nullptr);
+    uint32_t now = unix_now();
     uint32_t now_ms = millis();
     String body = "{\"reports\":[";
     for (int k = 0; k < n; k++) {
       const TrackerUpload& u = batch[k];
       const TrackerRecord& r = u.rec;
       // Zeitpunkt des Eintrags: Empfang der REQ minus Alter des Eintrags.
-      time_t at = now - (time_t)((now_ms - u.received_ms) / 1000) - (time_t)r.age_s;
-      String when = isoTime(at);
+      String when = unix_iso(unix_at(now, now_ms, u.received_ms, r.age_s));
       char item[400];
       int w = snprintf(item, sizeof(item),
                        "%s{\"counter\":%lu,\"received_at\":\"%s\",\"alarm\":%s,\"motion\":%s,\"charging\":%s,\"usb\":%s,"
@@ -161,12 +157,15 @@ static bool uploadBatch() {
                        k ? "," : "", (unsigned long)r.counter, when.c_str(), (r.flags & TRK_R_ALARM) ? "true" : "false",
                        (r.flags & TRK_R_MOTION) ? "true" : "false", u.charging ? "true" : "false",
                        u.usb ? "true" : "false", u.settings_version, u.snr, u.rssi);
+      if (w < 0 || w >= (int)sizeof(item)) w = sizeof(item) - 1;
       if (r.flags & TRK_R_FIX) {
         w += snprintf(item + w, sizeof(item) - w,
                       ",\"position\":{\"observed_at\":\"%s\",\"lat\":%.7f,\"lon\":%.7f,\"alt_m\":%d,\"sats\":%u,\"hdop\":%.1f}",
                       when.c_str(), r.lat_e7 / 1e7, r.lon_e7 / 1e7, r.alt_m, r.sats, r.hdop_x10 / 10.0);
       }
+      if (w < 0 || w >= (int)sizeof(item)) w = sizeof(item) - 1;
       if (u.batt_mv) w += snprintf(item + w, sizeof(item) - w, ",\"battery_mv\":%u", u.batt_mv);
+      if (w < 0 || w >= (int)sizeof(item) - 1) w = sizeof(item) - 2;
       snprintf(item + w, sizeof(item) - w, "}");
       body += item;
     }

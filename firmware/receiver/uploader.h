@@ -5,8 +5,8 @@
 #include <stdint.h>
 
 void uploader_begin();
-// Eine Messung von Sender sender_idx, empfangen bei millis() = received_ms, age_s Sekunden vor dem Senden gemessen.
-void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint8_t age_s, uint16_t level_mm);
+// Eine Messung von Sender sender_idx, empfangen bei millis() = received_ms, age_s Sekunden vor dem Senden gemessen (bei nachgesendeten Messungen auch Tage).
+void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint32_t age_s, uint16_t level_mm);
 // Kurzer Status für die Statuszeile auf Serial.
 void uploader_status(char* buf, int len);
 

@@ -1,15 +1,18 @@
 // Pegel-Empfänger (XIAO ESP32S3 + Wio-SX1262)
 //
-// Nimmt die 13-Byte-Messpakete der Sender an, prüft HMAC und Zähler und gibt jede gültige
-// Messung als JSON-Zeile auf Serial aus. Beantwortet die REQs der Sender, damit diese einen
-// Pfad hierher lernen bzw. prüfen können (siehe firmware/sender/main.cpp).
+// Nimmt die Messblöcke der Sender an (pegel_block.h), quittiert sie und gibt jeden Block als JSON-Zeile auf
+// Serial aus. Beantwortet die Pfad-REQs der Sender, damit diese einen Pfad hierher lernen bzw. prüfen können
+// (siehe firmware/sender/main.cpp).
 //
 // Außerdem Gateway für die GPS-Tracker (firmware/tracker): deren zwischengespeicherte Einträge kommen gebündelt
 // als verschlüsselte REQ (tracker_packet.h); die Antwort quittiert sie und trägt die aktuellen Einstellungen des
 // Trackers. Die Einträge gehen einzeln per tracker_uplink an die Tracker-API.
 //
-// Serial-Befehl zum Testen ohne API:  tset <tracker> <intervall> <alarm> <alarmintervall>
-//   Intervalle als Code 0..3 (1 / 5 / 15 / 60 min), alarm 0..3 (aus / leicht / mittel / sensibel).
+// Serial-Befehle:
+//   tset <tracker> <intervall> <alarm> <alarmintervall>   Tracker-Einstellungen zum Testen ohne API;
+//       Intervalle als Code 0..3 (1 / 5 / 15 / 60 min), alarm 0..3 (aus / leicht / mittel / sensibel).
+//   creset <sender>   vergisst den Zählerstand eines Pegel-Senders (nach Tausch oder Neuaufsetzen des Senders,
+//       dessen Zähler dann wieder klein anfängt).
 
 #include <Arduino.h>
 #include <Mesh.h>
@@ -20,6 +23,7 @@
 #include <target.h>
 
 #include "pegel_packet.h"
+#include "pegel_block.h"
 #include "tracker_packet.h"
 #include "secrets_receiver.h"
 #include "uploader.h"
@@ -39,8 +43,14 @@ struct Peer {
   uint8_t path_len;
   bool has_path;
   uint32_t last_counter;
+  uint32_t saved_counter;   // zuletzt in den Flash geschriebener Stand
   bool has_last;
 };
+
+// Der Zählerstand landet nur alle COUNTER_SAVE_STEP Zähler im Flash (NVS): bei jedem Block geschrieben, wären das
+// über 30 Jahre mehrere Millionen Schreibvorgänge je Sender. Nach einem Neustart fehlen höchstens so viele; das
+// schadet nicht, das Zählerfenster ist nach einem Neustart ohnehin offen.
+#define COUNTER_SAVE_STEP  64
 
 static Preferences prefs;
 static uint32_t rx_ok = 0, rx_rejected = 0, trk_ok = 0;
@@ -78,27 +88,12 @@ class ReceiverMesh : public mesh::Mesh {
   int matches[4];   // Mesh fragt per Index nach; Index -> peers[]
 
   void saveCounter(int i) {
+    Peer& p = peers[i];
+    if (p.last_counter - p.saved_counter < COUNTER_SAVE_STEP) return;
+    p.saved_counter = p.last_counter;
     char key[4];
     counterKey(key, i);
     prefs.putUInt(key, peers[i].last_counter);
-  }
-
-  void handleReading(const uint8_t* buf, float snr, float rssi) {
-    for (int i = 0; i < PEGEL_SENDER_COUNT; i++) {
-      Peer& p = peers[i];
-      PegelReading r;
-      if (!pegel_verify(PEGEL_HMAC_KEYS[i], buf, p.has_last, p.last_counter, r)) continue;
-      p.last_counter = r.counter;
-      p.has_last = true;
-      saveCounter(i);
-      rx_ok++;
-      uploader_push(i, millis(), r.age_s, r.level_mm);
-      Serial.printf("{\"sender\":\"%s\",\"counter\":%lu,\"level_mm\":%u,\"age_s\":%u,\"snr\":%.2f,\"rssi\":%.1f}\n",
-                    PEGEL_SENDER_NAMES[i], (unsigned long)r.counter, r.level_mm, r.age_s, snr, rssi);
-      return;
-    }
-    rx_rejected++;
-    Serial.println("rejected: unknown key, bad MAC or replayed counter");
   }
 
   // Antwort an Peer i: bei einer gefluteten REQ als Path-Return (lehrt den Rückweg), sonst als Datagramm.
@@ -113,6 +108,72 @@ class ReceiverMesh : public mesh::Mesh {
       if (p.has_path) sendDirect(resp, p.path, p.path_len, 300);
       else sendFlood(resp, 300);
     }
+  }
+
+  // Zähler, die mehr als das Fenster unter dem höchsten liegen, gelten als veraltet (der Stau des Senders fasst
+  // PEGEL_BACKLOG_LEN = 6144 Messungen). Innerhalb des Fensters merkt sich seen[] jeden angenommenen Zähler:
+  // wiederholte Blöcke (Quittung verloren) und eingespielte Kopien zählen nicht doppelt. seen[] liegt nur im RAM,
+  // nach einem Neustart des Empfängers ist das Fenster wieder offen.
+  static constexpr uint32_t PGB_COUNTER_WINDOW = 8192;
+  uint8_t seen[PEGEL_SENDER_COUNT][PGB_COUNTER_WINDOW / 8];
+
+  bool isSeen(int i, uint32_t ctr) { return seen[i][(ctr % PGB_COUNTER_WINDOW) / 8] & (1 << (ctr % 8)); }
+  void markSeen(int i, uint32_t ctr) { seen[i][(ctr % PGB_COUNTER_WINDOW) / 8] |= (uint8_t)(1 << (ctr % 8)); }
+  void unmarkSeen(int i, uint32_t ctr) { seen[i][(ctr % PGB_COUNTER_WINDOW) / 8] &= (uint8_t)~(1 << (ctr % 8)); }
+
+  // true, wenn der Zähler neu ist; schiebt das Fenster bei einem neuen Höchststand weiter.
+  bool acceptCounter(int i, uint32_t ctr) {
+    Peer& p = peers[i];
+    if (!p.has_last || ctr > p.last_counter) {
+      uint32_t from = p.has_last ? p.last_counter + 1 : ctr;
+      uint32_t span = ctr - from;   // ctr > last_counter, also kein Unterlauf
+      if (span >= PGB_COUNTER_WINDOW) memset(seen[i], 0, sizeof(seen[i]));
+      else for (uint32_t k = 0; k <= span; k++) unmarkSeen(i, from + k);
+      p.last_counter = ctr;
+      p.has_last = true;
+    } else if (p.last_counter - ctr >= PGB_COUNTER_WINDOW || isSeen(i, ctr)) {   // hier ist ctr <= last_counter
+      return false;
+    }
+    markSeen(i, ctr);
+    return true;
+  }
+
+  void handleBlock(int i, mesh::Packet* packet, const uint8_t* data, size_t len) {
+    static PegelBlock b;
+    if (!pgb_decode(data, (int)len, b)) {
+      Serial.printf("sender %s: unreadable block\n", peerName(i));
+      return;
+    }
+    // Quittung sofort, auf dem bekannten Pfad oder ohne Hops (ein Sender ohne Pfad sendet ohne Hops, ist also
+    // in Reichweite). Nie fluten: das kostete bei jeder Messung Sendezeit im ganzen Netz.
+    Peer& p = peers[i];
+    uint8_t ack[PGB_ACK_LEN];
+    pgb_encode_ack(b.tag, ack);
+    mesh::Packet* resp = createDatagram(PAYLOAD_TYPE_RESPONSE, p.id, p.secret, ack, sizeof(ack));
+    if (resp) {
+      if (p.has_path) sendDirect(resp, p.path, p.path_len, 300);
+      else sendZeroHop(resp, 300);
+    }
+
+    uint32_t now_ms = millis();
+    int accepted = 0, stale = 0;
+    for (int k = 0; k < b.n; k++) {
+      if (!acceptCounter(i, b.counter - k)) {
+        stale++;
+        continue;
+      }
+      uploader_push(i, now_ms, b.age_s + (uint32_t)k * b.interval_s, b.level_mm[k]);
+      accepted++;
+    }
+    if (accepted) saveCounter(i);
+    rx_ok += accepted;
+    rx_rejected += stale;
+    Serial.printf("{\"sender\":\"%s\",\"counter\":%lu,\"records\":%u,\"accepted\":%d,\"stale\":%d,"
+                  "\"last_counter\":%lu,\"level_mm\":%u,\"age_s\":%lu,\"batt_mv\":%u,\"snr\":%.2f,"
+                  "\"rssi\":%.1f,\"route\":\"%s\"}\n",
+                  peerName(i), (unsigned long)b.counter, b.n, accepted, stale, (unsigned long)p.last_counter,
+                  b.level_mm[0], (unsigned long)b.age_s, b.batt_mv, packet->getSNR(), _radio->getLastRSSI(),
+                  p.has_path ? "direct" : "zero hop");
   }
 
   // Gegen das Wiedereinspielen alter, längst gelöschter Pakete: nur Zähler annehmen, die höchstens so weit unter
@@ -138,7 +199,7 @@ class ReceiverMesh : public mesh::Mesh {
     int accepted = 0, stale = 0;
     for (int k = 0; k < u.n; k++) {
       const TrackerRecord& r = u.rec[k];
-      if (p.has_last && r.counter + TRK_COUNTER_WINDOW <= p.last_counter) {
+      if (p.has_last && r.counter <= p.last_counter && p.last_counter - r.counter >= TRK_COUNTER_WINDOW) {
         stale++;
         continue;
       }
@@ -207,6 +268,10 @@ protected:
       handleTracker(i, packet, secret, data, len);
       return;
     }
+    if (data[4] == PGB_TYPE) {
+      handleBlock(i, packet, data, len);
+      return;
+    }
     uint8_t out[5];
     memcpy(out, data, 4);
     out[4] = 'O';
@@ -214,12 +279,22 @@ protected:
     Serial.printf("REQ %s from %s, answered\n", packet->isRouteFlood() ? "flood" : "direct", peerName(i));
   }
 
-  void onRawDataRecv(mesh::Packet* packet) override {
-    if (packet->payload_len != PEGEL_PKT_LEN) return;
-    handleReading(packet->payload, packet->getSNR(), _radio->getLastRSSI());
+public:
+  bool resetCounter(const char* name) {
+    for (int i = 0; i < PEGEL_SENDER_COUNT; i++) {
+      if (strcmp(name, PEGEL_SENDER_NAMES[i]) != 0) continue;
+      char key[4];
+      counterKey(key, i);
+      prefs.remove(key);
+      peers[i].has_last = false;
+      peers[i].last_counter = 0;
+      peers[i].saved_counter = 0;
+      memset(seen[i], 0, sizeof(seen[i]));
+      return true;
+    }
+    return false;
   }
 
-public:
   ReceiverMesh(mesh::Radio& radio, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
     : mesh::Mesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables) { }
 
@@ -236,7 +311,9 @@ public:
       counterKey(key, i);
       p.has_last = prefs.isKey(key);
       p.last_counter = prefs.getUInt(key, 0);
+      p.saved_counter = p.last_counter;
     }
+    memset(seen, 0, sizeof(seen));
     mesh::Mesh::begin();
     Serial.printf("pegel receiver up, %d sender(s), %d tracker(s) known\n", PEGEL_SENDER_COUNT, TRACKER_COUNT);
   }
@@ -246,8 +323,14 @@ StdRNG fast_rng;
 SimpleMeshTables tables;
 ReceiverMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables);
 
-// "tset <tracker> <iv> <alarm> <alarm_iv>": Einstellungen von Hand, Version eins höher als bisher.
+// "creset <sender>": Zählerstand vergessen; "tset <tracker> <iv> <alarm> <alarm_iv>": Einstellungen von Hand, Version
+// eins höher als bisher.
 static void handleCommand(char* line) {
+  if (strncmp(line, "creset ", 7) == 0) {
+    if (the_mesh.resetCounter(line + 7)) Serial.printf("creset: counter of %s forgotten\n", line + 7);
+    else Serial.printf("creset: unknown sender %s\n", line + 7);
+    return;
+  }
   if (strncmp(line, "tset ", 5) != 0) return;
   char name[16];
   int iv, alarm, aiv;
