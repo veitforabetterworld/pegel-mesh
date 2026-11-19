@@ -35,9 +35,9 @@ Alle 20 Betriebsfälle erfüllen ihre Funktion, kein Bauteil liegt über seiner 
 
 | Funktion | Simuliert |
 |---|---|
-| Laden | Konstantstrom 2,00 A (Shunt 100 mV), Konstantspannung 3,50 V; ohne Akku hält der Lader VSYS auf 3,49 V |
-| Panel-Arbeitspunkt | 17,4 V bei 5-W-Panel und bei 10 % Licht (lädt dann 1,3 A bzw. 0,48 A); volle Sonne am 20-W-Panel: Strombegrenzung, Panel bei ~21 V |
-| Netzteil 12 V | mit Steckbrücke JP2 Laden ab 10,4 V Netzteilspannung, 2 A; ohne Steckbrücke lädt es nicht |
+| Laden | Konstantstrom 0,49 A (Shunt 49 mV), Konstantspannung 3,50 V; ohne Akku hält der Lader VSYS auf 3,49 V |
+| Panel-Arbeitspunkt | 17,4 V bei 10 % Licht (lädt dann 0,48 A); ab etwa 5 W Panel begrenzt der Ladestrom, Panel bei ~21 V |
+| Netzteil 12 V | mit Steckbrücke JP2 Laden ab 10,4 V Netzteilspannung, 0,49 A; ohne Steckbrücke lädt es nicht |
 | Ladesperre (Frost) | an beim Abkühlen unter 0,98 °C, frei beim Erwärmen über 3,1 °C; ohne NTC gesperrt |
 | Heizung | an unter 3,6 °C, aus über 5,1 °C, 0,35 A aus dem Panel bzw. 0,16 A aus 12 V; nachts 0 A |
 | Nacht | VSOL 0 V (Q1 sperrt den Rückweg über den Wandler), Akkustrom 6 mA (nur XIAO) |
@@ -49,7 +49,7 @@ Knapp, aber innerhalb der Grenzen (≥ 80 %):
 
 - D1 (SMBJ28A) 91 % der Sperrspannung bei −25 °C Panel-Leerlauf (25,4 V).
 - U3 (HT7550) 84 % der Eingangsspannung (25,1 V von 30 V) im selben Fall.
-- L1 84 % des Dauerstroms bei 2 A Ladestrom.
+- L1 (RLB0712-150KL) 82 % des Nennstroms als Spitze bei schwachem Licht (0,74 A von 0,9 A).
 - Logikpegel am XIAO 91–94 % der Absolutgrenze (Normalbetrieb).
 
 Bei der Auslegung gefundene und behobene Fehler:

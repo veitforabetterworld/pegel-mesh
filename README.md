@@ -1,10 +1,17 @@
 # pegel-mesh
 
-Wasserstände von entfernten Pegeln per Funk ins Netz, ohne Mobilfunk. Ein Sender am Fluss liest die Pegelsonde (RS485) und funkt über [MeshCore](https://github.com/meshcore-dev/MeshCore) (868 MHz) zu einem Empfänger mit WLAN, der die Werte an die **hochwasserdienst**-API schickt. Der Sender läuft mit Solarpanel und LiFePO4-Akku.
+Wasserstände von entfernten Pegeln per Funk ins Netz, ohne Mobilfunk. Ein Sender am Fluss liest die Pegelsonde (RS485) und funkt über [MeshCore](https://github.com/meshcore-dev/MeshCore) (868 MHz) zu einem Empfänger mit WLAN, der die Werte an die **hochwasserdienst**-API schickt. Der Sender läuft mit Solarpanel und Akku.
 
 ![Trägerplatine](hardware/pegel-sender/preview/pegel-sender-top.png)
 
-## Platine
+Zwei Trägerplatinen, eine Firmware (gleiche XIAO-Pins; die Firmware erkennt den Akku selbst):
+
+| Platine | Akku | Versorgung |
+|---|---|---|
+| [`pegel-sender`](hardware/pegel-sender/README.md) (v1, 100 × 70 mm) | LiFePO4 oder ohne | Solarpanel 12-V-Klasse oder 12-V-Netzteil |
+| [`pegel-sender-v2`](hardware/pegel-sender-v2/README.md) (70 × 40 mm) | Li-Ionen oder ohne | USB-C-Netzteil oder USB-C-Solarpanel (5 V) |
+
+## Platine (v1)
 
 Die SMD-Teile bestückt JLCPCB (Dateien in [`hardware/pegel-sender/fab/`](hardware/pegel-sender/fab/)). Selbst löten:
 
@@ -12,8 +19,8 @@ Die SMD-Teile bestückt JLCPCB (Dateien in [`hardware/pegel-sender/fab/`](hardwa
 |---|---|---|
 | SOLAR/12V, AKKU | Schraubklemme 2-pol., Raster 5,08 mm | Phoenix MKDS 1,5/2-5,08 |
 | SONDE, HEIZ/NTC | Schraubklemme 4-pol., Raster 5,08 mm | Phoenix MKDS 1,5/4-5,08 |
-| L1 | Spule 15 µH, ≥ 2,4 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0914-150KL |
-| L2 | Spule 10 µH, ≥ 0,5 A, radial Ø 8,7 mm, Raster 5 mm | Bourns RLB0912-100KL |
+| L1 | Spule 15 µH, ≥ 0,9 A, radial Ø 7 mm, Raster 3 mm | Bourns RLB0712-150KL |
+| L2 | Spule 10 µH, ≥ 0,5 A, radial Ø 7 mm, Raster 3 mm | Bourns RLB0712-100KL |
 | C22 | Elko 220 µF 16 V, Polymer oder Low-ESR, Ø 8 mm, Raster 3,5 mm | Panasonic 16SEPF220M |
 | C23 | Elko 220 µF 50 V, Low-ESR, Ø 10 mm, Raster 5 mm | Panasonic EEU-FR1H221 |
 | XIAO | 2× Buchsenleiste 1×7, 2,54 mm | |
@@ -73,7 +80,7 @@ Immer `tools/pio.py` statt `pio` aufrufen; es hängt `pegel.ini` in das MeshCore
 
 ## Funkausfall und Nachsenden
 
-Der Sender hält jede Messung im RAM, bis der Empfänger sie quittiert: 6144 Messungen, bei Sender A gut 4 Tage, bei Sender B gut 3 Wochen. Ist der Puffer voll, fällt die älteste Messung heraus; nach 30 Tagen verfällt eine Messung ebenfalls. Ein Neustart des Senders (Update, Tiefentladung) verwirft den Puffer.
+Der Sender hält jede Messung, bis der Empfänger sie quittiert: 6144 Messungen, bei Sender A gut 4 Tage, bei Sender B gut 3 Wochen. Ist der Puffer voll, fällt die älteste Messung heraus; nach 30 Tagen verfällt eine Messung ebenfalls. Bei gestörter Verbindung stehen die Messungen zusätzlich im Flash und überstehen Stromausfall und Neustart; die Uhrzeit dafür kommt mit jeder Quittung vom Empfänger.
 
 - Im Messtakt geht immer ein Block mit den neuesten Messungen raus (bis 75 je Paket). Bleibt die Quittung aus, versucht es der Sender erst im nächsten Messtakt wieder.
 - Kam die Quittung, folgt der restliche Stau Block für Block, neueste zuerst, solange das Sendebudget von 1 % je Stunde reicht (MeshCore setzt es durch). Ein Tag Ausfall von Sender A ist so in knapp einer Stunde nachgeholt.
@@ -83,7 +90,9 @@ Fängt der Zähler eines Senders neu an (Tausch, Neuaufsetzen), übernimmt der E
 
 ## Langzeitbetrieb
 
-Die Firmware ist für den Betrieb über viele Jahrzehnte ausgelegt (Watchdog, Überlauf- und Verschleißschutz). Der Empfänger nimmt die Uhrzeit vom Server.
+Die Firmware ist für den Betrieb über viele Jahrzehnte ausgelegt (Watchdog, Überlauf- und Verschleißschutz). Der Empfänger nimmt die Uhrzeit vom Server. Zwischen den Messungen schlafen Funkchip und CPU. Bei gestörter Verbindung schreibt der Sender jede Messung mit Uhrzeit in den Flash: nach einem Stromausfall sendet er sie mit dem richtigen Zeitstempel nach.
+
+Notfallwege testen: Builds `pegel_sender_a_test` und `pegel_receiver_test` (Serial-Befehle in `firmware/sender/main.cpp` bzw. `firmware/receiver/main.cpp`, `PEGEL_TEST_CMDS`).
 
 ## GPS-Tracker
 

@@ -42,7 +42,7 @@ SYS_LOSS = 0.90            # Verschmutzung, Fehlanpassung, Leitungen
 V_MPPT = 17.2              # Panel-Arbeitspunkt der Regelung (LM324, Kanal B)
 R_HEAT = 68.0              # Heizwiderstand am Akku (J4)
 ETA_CHG = 0.85             # TPS5430 mit Rückstromsperre und Shunt
-P_CHG_MAX_OUT = 2.0 * 3.4  # Ladestrom 2 A
+P_CHG_MAX_OUT = 0.5 * 3.4  # Ladestrom 0,5 A
 P_CTRL = 17.2 * 0.004      # Regelung (HT7550, LM324, CJ431) aus dem Panel, nur bei Sonne
 ETA_BAT = 0.96
 

@@ -69,11 +69,11 @@ LAYOUT = {
                    ("T_NTC", 21, 27, "L"), ("T_REF0", 21, 29, "L"), ("T_REF2", 21, 35, "L"),
                    ("CHG_INH", 31, 30, "R"), ("HEAT_OFF", 31, 36, "R")],
     },
-    # Akku an J2, Strommessung R15‖R16 im Minuspol
+    # Akku an J2, Strommessung R15 im Minuspol
     "battery": {
         "parts": {
             "J2": (10, 0, 0),
-            "R15": (4, 4, 0), "R16": (7, 4, 0),
+            "R15": (4, 4, 0),
         },
         "power": [("VSYS", 4, -1)],
         "labels": [("BAT_N", 2, 2, "L")],

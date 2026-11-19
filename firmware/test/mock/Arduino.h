@@ -1,5 +1,5 @@
 #pragma once
-// Arduino-Nachbildung für den PC-Test: simulierte Zeit, Pins, Serial1 am RS485-Bus, SAADC an VDD.
+// Arduino-Nachbildung für den PC-Test: simulierte Zeit, Pins, Serial1 am RS485-Bus, SAADC an VDD und am BAT-Teiler.
 #include <stdint.h>
 #include <stddef.h>
 #include <algorithm>
@@ -12,11 +12,16 @@
 #define INPUT 0
 #define D0 0
 #define AR_INTERNAL 1
+#define AR_INTERNAL_3_0 2
+#define VBAT_ENABLE 14
+#define PIN_CHARGING_CURRENT 22
+#define PIN_VBAT 32
 
 namespace sim {
 extern uint32_t now_ms;
-extern int pin_state[16];
+extern int pin_state[64];
 extern uint32_t vdd_mv;        // Versorgung des XIAO
+extern uint32_t vbat_mv;       // BAT des XIAO (0 = offen, alte Platine)
 extern int adc_reference;
 extern int adc_bits;
 void tick();   // jede Zeitabfrage lässt 1 ms vergehen: Warte-Schleifen enden immer
@@ -33,6 +38,12 @@ inline uint32_t analogReadVDD() {
   if (sim::adc_reference != AR_INTERNAL) return 0;
   uint32_t full = (1u << sim::adc_bits) - 1;
   return std::min<uint32_t>(full, sim::vdd_mv * full / 3600);
+}
+// SAADC an P0.31 hinter dem Teiler 1 MΩ / 510 kΩ (nur bei P0.14 low), Referenz 3,0 V
+inline uint32_t analogRead(int pin) {
+  if (pin != PIN_VBAT || sim::adc_reference != AR_INTERNAL_3_0 || sim::pin_state[VBAT_ENABLE] != LOW) return 0;
+  uint32_t full = (1u << sim::adc_bits) - 1;
+  return std::min<uint32_t>(full, sim::vbat_mv * 510 / 1510 * full / 3000);
 }
 using std::min;
 using std::max;

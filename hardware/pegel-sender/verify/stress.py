@@ -119,19 +119,19 @@ def switching(res: Result) -> list[tuple]:
         cin_rms = iout * math.sqrt(D * (1 - D))
         rows += [
             ("U1", "I Schalter Spitze [A] (Strombegrenzung min. 4 A)", ipk, 4.0),
-            ("D3", "I Mittel [A]", iout * (1 - D), RATINGS["SS54"]["If"]),
-            ("D3", "P [W]", iout * (1 - D) * 0.45, RATINGS["SS54"]["P"]),
-            ("L1", "I Spitze [A] (Isat)", ipk, RATINGS["RLB0914-150KL"]["Isat"]),
-            ("L1", "I eff [A]", math.sqrt(iout ** 2 + di ** 2 / 12), RATINGS["RLB0914-150KL"]["Irms"]),
+            ("D3", "I Mittel [A]", iout * (1 - D), RATINGS["SS34"]["If"]),
+            ("D3", "P [W]", iout * (1 - D) * 0.45, RATINGS["SS34"]["P"]),
+            ("L1", "I Spitze [A] (Isat)", ipk, RATINGS["RLB0712-150KL"]["Isat"]),
+            ("L1", "I eff [A]", math.sqrt(iout ** 2 + di ** 2 / 12), RATINGS["RLB0712-150KL"]["Irms"]),
             ("C1–C3", "Rippelstrom je C [A]", cin_rms / 3, 2.0),
-            ("R15/R16", "P je R [W]", (res.V("BAT_N") ** 2) / (2 * R_SHUNT) / 2, 0.25),
+            ("R15", "P [W]", (res.V("BAT_N") ** 2) / R_SHUNT, 0.25),
         ]
     v12, vin_b = res.V("V12_RAW"), res.V("VSYS")
     if res.V("SENS_EN") > 1.5 and v12 > vin_b + 1:
         iout = res.sc.probe_ma / 1000 if res.V("V12_PROBE") > 8 else 0
         ilim_max = 0.475
         rows += [
-            ("L2", "I Spitze [A] (Isat)", ilim_max, RATINGS["RLB0912-100KL"]["Isat"]),
+            ("L2", "I Spitze [A] (Isat)", ilim_max, RATINGS["RLB0712-100KL"]["Isat"]),
             ("D7", "I Spitze [A]", ilim_max, 2.0),
             ("D7", "I Mittel [A]", iout, RATINGS["B0540W"]["If"]),
             ("D7", "U Sperr [V]", v12, RATINGS["B0540W"]["Vr"]),

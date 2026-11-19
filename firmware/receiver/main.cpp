@@ -28,6 +28,7 @@
 #include "tracker_packet.h"
 #include "secrets_receiver.h"
 #include "uploader.h"
+#include "unix_time.h"
 #include "tracker_uplink.h"
 
 #ifndef TRACKER_COUNT
@@ -62,8 +63,12 @@ struct Peer {
 // Fängt der Zähler eines Senders neu an (Flash verloren, Gerät getauscht), wären alle seine Blöcke "veraltet".
 // Kommen mindestens RESYNC_BLOCKS solcher Blöcke mit steigendem Zähler über mindestens RESYNC_MIN_MS, gilt der
 // neue Stand wie nach creset. Ein Angreifer müsste dafür ebenso viele aufgezeichnete Blöcke in Folge einspielen.
-#define RESYNC_BLOCKS  30
-#define RESYNC_MIN_MS  (30UL * 60 * 1000)
+#ifndef RESYNC_BLOCKS
+  #define RESYNC_BLOCKS  30
+#endif
+#ifndef RESYNC_MIN_MS
+  #define RESYNC_MIN_MS  (30UL * 60 * 1000)
+#endif
 
 // Der Zählerstand landet nur alle COUNTER_SAVE_STEP Zähler im Flash (NVS): bei jedem Block geschrieben, wären das
 // über 30 Jahre mehrere Millionen Schreibvorgänge je Sender. Nach einem Neustart fehlen höchstens so viele; das
@@ -157,7 +162,7 @@ class ReceiverMesh : public mesh::Mesh {
   void forgetCounter(int i) {
     char key[4];
     counterKey(key, i);
-    prefs.remove(key);
+    if (prefs.isKey(key)) prefs.remove(key);
     peers[i].has_last = false;
     peers[i].last_counter = 0;
     peers[i].saved_counter = 0;
@@ -209,7 +214,7 @@ class ReceiverMesh : public mesh::Mesh {
     // in Reichweite). Nie fluten: das kostete bei jeder Messung Sendezeit im ganzen Netz. Doppelte (Quittung
     // verloren) werden ebenfalls quittiert, sonst schickte der Sender sie immer wieder.
     uint8_t ack[PGB_ACK_LEN];
-    pgb_encode_ack(b.tag, ack);
+    pgb_encode_ack(b.tag, unix_now(), ack);   // die Uhrzeit stellt die Uhr des Senders
     mesh::Packet* resp = createDatagram(PAYLOAD_TYPE_RESPONSE, p.id, p.secret, ack, sizeof(ack));
     if (resp) {
       if (p.has_path) sendDirect(resp, p.path, p.path_len, 300);
@@ -223,7 +228,9 @@ class ReceiverMesh : public mesh::Mesh {
         stale++;
         continue;
       }
-      uploader_push(i, now_ms, b.age_s + (uint32_t)k * b.interval_s, b.level_mm[k]);
+      uint64_t back = (uint64_t)k * b.interval_s;
+      if (b.flags & PGB_F_ABS) uploader_push_at(i, b.time > back ? b.time - back : 0, b.level_mm[k]);
+      else uploader_push(i, now_ms, (uint32_t)(b.time + back), b.level_mm[k]);
       accepted++;
     }
     if (accepted) saveCounter(i);
@@ -233,7 +240,7 @@ class ReceiverMesh : public mesh::Mesh {
                   "\"last_counter\":%lu,\"level_mm\":%u,\"age_s\":%lu,\"batt_mv\":%u,\"snr\":%.2f,"
                   "\"rssi\":%.1f,\"route\":\"%s\"}\n",
                   peerName(i), (unsigned long)b.counter, b.n, accepted, stale, (unsigned long)p.last_counter,
-                  b.level_mm[0], (unsigned long)b.age_s, b.batt_mv, packet->getSNR(), _radio->getLastRSSI(),
+                  b.level_mm[0], (unsigned long)b.time, b.batt_mv, packet->getSNR(), _radio->getLastRSSI(),
                   p.has_path ? "direct" : "zero hop");
   }
 
@@ -355,6 +362,19 @@ public:
     radio_driver.resetAGC();
   }
 
+#if PEGEL_TEST_CMDS
+  bool setCounter(const char* name, uint32_t value) {
+    for (int i = 0; i < PEGEL_SENDER_COUNT; i++) {
+      if (strcmp(name, PEGEL_SENDER_NAMES[i]) != 0) continue;
+      forgetCounter(i);
+      peers[i].last_counter = value;
+      peers[i].has_last = true;
+      return true;
+    }
+    return false;
+  }
+#endif
+
   bool resetCounter(const char* name) {
     for (int i = 0; i < PEGEL_SENDER_COUNT; i++) {
       if (strcmp(name, PEGEL_SENDER_NAMES[i]) != 0) continue;
@@ -399,6 +419,33 @@ ReceiverMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables);
 // "creset <sender>": Zählerstand vergessen; "tset <tracker> <iv> <alarm> <alarm_iv>": Einstellungen von Hand, Version
 // eins höher als bisher.
 static void handleCommand(char* line) {
+#if PEGEL_TEST_CMDS
+  // Notfallwege auslösen (nur im Test-Build pegel_receiver_test)
+  if (strcmp(line, "thang") == 0) {
+    Serial.println("test: loop hangs, task watchdog should restart");
+    for (;;) { }
+  }
+  if (strcmp(line, "theap") == 0) {
+    int n = 0;
+    while (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= 24000 &&
+           heap_caps_malloc(16000, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)) n++;
+    Serial.printf("test: %d x 16 KB taken, largest block now %u\n", n,
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    return;
+  }
+  if (strcmp(line, "tradio") == 0) {
+    Serial.printf("test: radio restart %s\n", radio.std_init() ? "ok" : "failed");
+    radio_driver.resetAGC();
+    return;
+  }
+  char tname[16];
+  unsigned long tval;
+  if (sscanf(line, "tcounter %15s %lu", tname, &tval) == 2) {
+    Serial.printf("test: counter of %s set to %lu: %s\n", tname, tval,
+                  the_mesh.setCounter(tname, (uint32_t)tval) ? "ok" : "unknown sender");
+    return;
+  }
+#endif
   if (strncmp(line, "creset ", 7) == 0) {
     if (the_mesh.resetCounter(line + 7)) Serial.printf("creset: counter of %s forgotten\n", line + 7);
     else Serial.printf("creset: unknown sender %s\n", line + 7);

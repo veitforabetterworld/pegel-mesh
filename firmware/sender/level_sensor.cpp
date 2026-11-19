@@ -105,8 +105,13 @@ static bool readRegister(uint16_t reg, uint16_t& value) {
 
 static uint8_t measure(uint16_t& level_mm) {
   if (!bus_ok && !(bus_ok = busBegin())) return LEVEL_NO_INTERFACE;
+  // Bis zu drei Versuche: nach einem Neustart verpasst die Sonde die erste Anfrage gelegentlich.
   uint16_t cm;
-  if (!readRegister(PEGEL_LEVEL_REGISTER, cm)) return LEVEL_NO_RESPONSE;
+  int tries = 0;
+  while (!readRegister(PEGEL_LEVEL_REGISTER, cm)) {
+    if (++tries >= 3) return LEVEL_NO_RESPONSE;
+    delay(200);
+  }
   if (cm > PEGEL_LEVEL_MAX_CM) return LEVEL_OUT_OF_RANGE;
   long mm = (long)cm * 10 + PEGEL_SENSOR_OFFSET_MM;
   level_mm = (uint16_t)constrain(mm, 0L, (long)PEGEL_LEVEL_MAX_MM);

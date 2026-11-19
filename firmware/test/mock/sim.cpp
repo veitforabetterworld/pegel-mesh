@@ -3,8 +3,9 @@
 
 namespace sim {
 uint32_t now_ms = 0;
-int pin_state[16] = {};
+int pin_state[64] = {};
 uint32_t vdd_mv = 3100;
+uint32_t vbat_mv = 0;
 int adc_reference = 0;
 int adc_bits = 10;
 void tick() { now_ms += 1; }

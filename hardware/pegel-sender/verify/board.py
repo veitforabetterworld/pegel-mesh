@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import design  # noqa: E402
 from models import DIODE_MODEL, MOS_MODEL, SPICE_MODELS  # noqa: E402
 
-R_SHUNT = 0.1 / 2                # R15 ‖ R16 im Minuspol des Akkus
+R_SHUNT = 0.1                    # R15 im Minuspol des Akkus
 OCV = [(0.0, 2.50), (0.02, 2.90), (0.05, 3.10), (0.10, 3.20), (0.20, 3.25), (0.40, 3.29), (0.60, 3.31),
        (0.80, 3.33), (0.90, 3.34), (0.97, 3.40), (1.0, 3.60)]
 CAPACITY_AS = 18.0 * 3600       # 3 × 6 Ah (32700) parallel

@@ -21,13 +21,12 @@ ZONE_W = 10.0     # Fläche: als 10 mm breit gewertet
 PATHS = [
     ("Panel/Netzteil → Verpolschutz D2", "J1.1", "D2.2", 1.2),
     ("D2 → Lader-Eingang U1", "D2.1", "U1.7", 0.8),
-    ("Schaltknoten U1 → L1", "U1.8", "L1.1", 1.2),   # Effektivstrom im Schalter bei 2 A, Tastgrad ~0,25
-    ("Freilaufdiode D3 → L1", "D3.1", "L1.1", 2.0),
-    ("L1 → Rückstromsperre Q1", "L1.2", "Q1.3", 2.0),
-    ("Q1 → Akku+", "Q1.2", "J2.2", 2.0),
-    ("Akku− → Shunt R15", "J2.1", "R15.1", 1.0),
-    ("Akku− → Shunt R16", "J2.1", "R16.1", 1.0),
-    ("Shunt → GND (Lader)", "R15.2", "D3.2", 2.0),
+    ("Schaltknoten U1 → L1", "U1.8", "L1.1", 0.3),   # Effektivstrom im Schalter bei 0,5 A, Tastgrad ~0,25
+    ("Freilaufdiode D3 → L1", "D3.1", "L1.1", 0.5),
+    ("L1 → Rückstromsperre Q1", "L1.2", "Q1.3", 0.5),
+    ("Q1 → Akku+", "Q1.2", "J2.2", 0.5),
+    ("Akku− → Shunt R15", "J2.1", "R15.1", 0.5),
+    ("Shunt → GND (Lader)", "R15.2", "D3.2", 0.5),
     ("VSOL → Heizung (J4)", "D2.1", "J4.1", 0.4),
     ("Heizung → Q4", "J4.2", "Q4.3", 0.4),
     ("Akku+ → 12-V-Wandler L2", "J2.2", "L2.1", 0.5),

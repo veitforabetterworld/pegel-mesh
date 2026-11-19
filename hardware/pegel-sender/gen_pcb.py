@@ -26,7 +26,7 @@ ORIGIN = (50.0, 50.0)       # Lage der Platine im KiCad-Blatt
 # Bahnbreite je Netz mit Reserve (IPC-2221, 35 µm außen, ≤ 10 K Erwärmung): 2,0 mm trägt ~4 A, 0,8 mm ~2 A,
 # 0,6 mm ~1,6 A, 0,3 mm ~0,9 A. Die 3-A-Pfade liegen zusätzlich als Kupferflächen (route.py).
 NET_WIDTH = [
-    (2.0, {"CHG_SW", "CHG_OUT", "BAT_N"}),                                   # Ladestrom 2 A
+    (2.0, {"CHG_SW", "CHG_OUT", "BAT_N"}),                                   # Ladestrom 0,5 A, Reserve
     (1.2, {"VSYS"}),                                                          # Ladestrom und Lasten
     (0.8, {"IN_RAW", "VSOL", "HEAT_N", "BST_SW"}),                           # bis 1,2 A
     (0.6, {"V12_RAW", "V12_PROBE", "XIAO_3V3"}),                             # bis 0,15 A

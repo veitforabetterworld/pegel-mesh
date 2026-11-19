@@ -14,9 +14,9 @@
 #define UNIX_VALID_AFTER  1700000000ULL   // davor gilt eine Uhrzeit als nicht gestellt
 #define UNIX_ISO_LEN      32
 
-// Sekunden seit 1970 (UTC), 0 solange keine gültige Zeit bekannt ist. Nur aus dem Uploader-Task.
+// Sekunden seit 1970 (UTC), 0 solange keine gültige Zeit bekannt ist. Aus jedem Task.
 uint64_t unix_now();
-// Stellt die Uhr (Sekunden seit 1970) nach einer Server-Antwort. Nur aus dem Uploader-Task.
+// Stellt die Uhr (Sekunden seit 1970) nach einer Server-Antwort.
 void unix_sync(uint64_t t);
 
 // Tage seit 1970 zu einem Datum ab 1970 (Howard Hinnant, days_from_civil).

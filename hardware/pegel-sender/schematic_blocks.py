@@ -53,7 +53,7 @@ def arrow(a: tuple[float, float], b: tuple[float, float], via: list[tuple[float,
 def build() -> str:
     parts = []
     parts.append(box("solar", 40, 68, 170, 168, "Eingang J1", ["Solar oder 12 V", "Steckbrücke JP2:", "Netzteil"]))
-    parts.append(box("charger", 290, 68, 200, 168, "TPS5430", ["Lader 3,50 V, 2 A", "LM324 regelt Strom,", "Panel 17 V, Frost"]))
+    parts.append(box("charger", 290, 68, 200, 168, "TPS5430", ["Lader 3,50 V, 0,5 A", "LM324 regelt Strom,", "Panel 17 V, Frost"]))
     parts.append(box("vsys", 570, 68, 160, 168, "VSYS", ["Akku 2,8–3,5 V", "nachts getrennt"]))
     parts.append(box("v33", 810, 48, 210, 88, "B5819W", ["Akku direkt", "zum XIAO"]))
     parts.append(box("v12", 810, 168, 210, 88, "TPS61040", ["12 V Sonde", "Schaltbar über D0"]))

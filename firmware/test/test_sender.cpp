@@ -107,7 +107,8 @@ static void test_level() {
   uint32_t t0 = sim::now_ms;
   st = level_sensor_read_mm(mm);
   CHECK(st == LEVEL_NO_RESPONSE, "Sonde stumm: Status %u", st);
-  CHECK(sim::now_ms - t0 < 1000, "Zeitüberschreitung dauert %u ms", (unsigned)(sim::now_ms - t0));
+  // drei Versuche zu je 300 ms mit 200 ms Pause
+  CHECK(sim::now_ms - t0 < 1500, "Zeitüberschreitung dauert %u ms", (unsigned)(sim::now_ms - t0));
 
   probe.mode = Probe::BAD_CRC;
   level_sensor_power(true);
@@ -130,31 +131,50 @@ static void test_battery() {
       {"Akku 2,8 V", 2600, 2800},
       {"Akku 2,6 V", 2400, 2600},
   };
+  sim::vbat_mv = 0;   // alte Platine: BAT des XIAO offen
   for (auto& c : cases) {
     sim::vdd_mv = c.vdd;
     sim::adc_reference = 0;
     sim::adc_bits = 10;
     uint16_t mv = 0;
-    bool ok = battery_read(mv);
-    CHECK(ok && std::abs((int)mv - (int)c.bat) <= 25, "%s: %u mV (erwartet %u mV)", c.name, mv, c.bat);
+    BatteryKind kind = BAT_LIION;
+    bool ok = battery_read(mv, kind);
+    CHECK(ok && kind == BAT_LIFEPO4 && std::abs((int)mv - (int)c.bat) <= 25, "%s: %u mV (erwartet %u mV)", c.name,
+          mv, c.bat);
     std::printf("  %-34s VDD %4u mV -> Akku %5u mV\n", c.name, c.vdd, mv);
   }
   sim::vdd_mv = 0;
   uint16_t mv;
-  CHECK(!battery_read(mv), "VDD 0 V als gültig gemeldet");
+  BatteryKind kind;
+  CHECK(!battery_read(mv, kind), "VDD 0 V als gültig gemeldet");
+
+  std::printf("Akkuspannung an BAT (neue Platine, Li-Ionen am Lader des XIAO):\n");
+  sim::vdd_mv = 3300;   // Regler des XIAO
+  for (uint32_t bat : {4200u, 3700u, 3400u, 3200u}) {
+    sim::vbat_mv = bat;
+    uint16_t m = 0;
+    BatteryKind k = BAT_LIFEPO4;
+    bool ok = battery_read(m, k);
+    CHECK(ok && k == BAT_LIION && std::abs((int)m - (int)bat) <= 25, "BAT %u mV: %u mV, Art %u", bat, m, k);
+    std::printf("  BAT %4u mV -> %4u mV %s\n", bat, m, k == BAT_LIION ? "Li-Ionen" : "LiFePO4");
+  }
+  sim::vbat_mv = 0;
 }
 
 static void test_low_battery() {
-  std::printf("Unterspannung (Hysterese %u/%u mV, Abschaltung unter %u mV):\n", PEGEL_BATTERY_LOW_MV,
-              PEGEL_BATTERY_OK_MV, PEGEL_BATTERY_CUTOFF_MV);
+  const BatteryLimits& l = BATTERY_LIMITS[BAT_LIFEPO4];
+  std::printf("Unterspannung LiFePO4 (Hysterese %u/%u mV, Abschaltung unter %u mV):\n", l.low, l.ok, l.cutoff);
   struct Step { uint16_t mv; bool low; } seq[] = {
       {3300, false}, {2900, false}, {2801, false}, {2799, true}, {2850, true}, {2999, true}, {3000, false}, {2950, false}};
   bool low = false;
   for (auto& s : seq) {
-    low = battery_low_update(low, s.mv);
+    low = battery_low_update(low, s.mv, BAT_LIFEPO4);
     CHECK(low == s.low, "%u mV: %s (erwartet %s)", s.mv, low ? "leer" : "ok", s.low ? "leer" : "ok");
   }
-  CHECK(battery_cutoff(2599) && !battery_cutoff(2600), "Abschaltschwelle nicht bei 2600 mV");
+  CHECK(battery_cutoff(2599, BAT_LIFEPO4) && !battery_cutoff(2600, BAT_LIFEPO4), "Abschaltschwelle nicht bei 2600 mV");
+  CHECK(battery_low_update(false, 3399, BAT_LIION) && !battery_low_update(true, 3600, BAT_LIION) &&
+            battery_cutoff(3249, BAT_LIION) && !battery_cutoff(3250, BAT_LIION),
+        "Li-Ionen-Schwellen");
 }
 
 int main() {

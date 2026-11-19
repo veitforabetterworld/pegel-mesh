@@ -59,6 +59,7 @@ def zone(board, net, layer, rect, priority):
 
 
 VIA_D, VIA_DRILL = 0.6, 0.3
+ROUTE_MARGIN = 0.05   # mm Abstandsreserve nur beim Routen (route_board)
 
 
 def stitch(board):
@@ -770,7 +771,7 @@ def drop_redundant_gnd(board):
     return removed
 
 
-def chamfer_corners(board, gap=0.3):
+def chamfer_corners(board, gap=0.35):   # 0,05 mm Reserve über dem größten Netzklassen-Abstand
     """Rechte Winkel zwischen zwei Bahnen desselben Netzes durch eine 45°-Schräge ersetzen, wo der Abstand reicht."""
     tracks = []
     for t in board.GetTracks():
@@ -896,7 +897,6 @@ PREROUTE = []
 # (Ref, Pad, [Versatz der Vias zum Padmittelpunkt in mm])
 GND_TIES = [
     ("R15", "2", [(0.0, 2.0)]),
-    ("R16", "2", [(0.0, 2.0)]),
     ("D3", "2", [(-1.1, 2.2), (1.1, 2.2)]),
 ]
 
@@ -991,8 +991,15 @@ def route_board(board, jar, java):
     gnd_ties(board)
     keepouts(board)
     # GND nicht vorher als Fläche: sonst lässt Freerouting die Masse-Pins offen, sobald die Fläche zerrissen ist.
+    # Freerouting hält die Abstände nicht immer bis auf den letzten Hundertstel ein: mit ROUTE_MARGIN Reserve
+    # routen, danach gelten wieder die echten Netzklassen.
+    saved = [(nc, nc.GetClearance()) for nc in board.GetDesignSettings().m_NetSettings.GetNetclasses().values()]
+    for nc, clr in saved:
+        nc.SetClearance(clr + mm(ROUTE_MARGIN))
     if not pcbnew.ExportSpecctraDSN(board, DSN):
         raise SystemExit("DSN export failed")
+    for nc, clr in saved:
+        nc.SetClearance(clr)
     subprocess.run([java, "-jar", jar, "-de", DSN, "-do", SES, "-mp", "500", "--gui.enabled=false"], check=True)
     if not pcbnew.ImportSpecctraSES(board, SES):
         raise SystemExit("SES import failed")

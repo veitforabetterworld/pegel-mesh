@@ -34,7 +34,7 @@ SOT23 = "Package_TO_SOT_SMD:SOT-23"
 SOD123 = "Diode_SMD:D_SOD-123"
 TERM2 = "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
 TERM4 = "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal"
-L_RADIAL = "Inductor_THT:L_Radial_D8.7mm_P5.00mm_Fastron_07HCP"
+L_RADIAL = "Inductor_THT:L_Radial_D7.0mm_P3.00mm"   # Bourns RLB0712: Ø 7 mm, Rastermaß 3 mm
 
 # LCSC-Nummern der Basic-Widerstände (UNI-ROYAL, 1 %)
 RES_LCSC = {
@@ -92,8 +92,8 @@ add("J1", "Connector:Screw_Terminal_01x02", TERM2, "SOLAR / 12V", "Klemme 2-pol.
     {"1": "IN_RAW", "2": GND}, g, hand=True)
 add("D1", "Device:D_TVS", "Diode_SMD:D_SMB", "SMBJ28A", "SMBJ28A", {"1": "IN_RAW", "2": GND}, g, lcsc="C19077582")
 # Verpolschutz; nachts fließt nichts aus VSOL ins Panel zurück
-add("D2", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS54", "SS54 (40 V 5 A)", {"1": "VSOL", "2": "IN_RAW"}, g,
-    lcsc="C22452")
+add("D2", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS34", "SS34 (40 V 3 A)", {"1": "VSOL", "2": "IN_RAW"}, g,
+    lcsc="C8678")
 c("C1", "10uF 50V", "VSOL", GND, g)
 c("C2", "10uF 50V", "VSOL", GND, g)
 c("C3", "10uF 50V", "VSOL", GND, g)
@@ -110,9 +110,9 @@ add("U1", "Regulator_Switching:TPS5430DDA", "Package_SO:TI_SO-PowerPAD-8_Thermal
     g, lcsc="C9864")
 c("C4", "100nF", "VSOL", GND, g)
 c("C5", "10nF", "CHG_BOOT", "CHG_SW", g)
-add("D3", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS54", "SS54 (40 V 5 A)", {"1": "CHG_SW", "2": GND}, g,
-    lcsc="C22452")
-add("L1", "Device:L", L_RADIAL, "15uH", "Bourns RLB0914-150KL (15 µH, 2,4 A)", {"1": "CHG_SW", "2": "CHG_OUT"}, g,
+add("D3", "Device:D_Schottky", "Diode_SMD:D_SMA", "SS34", "SS34 (40 V 3 A)", {"1": "CHG_SW", "2": GND}, g,
+    lcsc="C8678")
+add("L1", "Device:L", L_RADIAL, "15uH", "Bourns RLB0712-150KL (15 µH, 0,9 A)", {"1": "CHG_SW", "2": "CHG_OUT"}, g,
     hand=True)
 c("C6", "22uF 25V", "CHG_OUT", GND, g)
 c("C7", "22uF 25V", "CHG_OUT", GND, g)
@@ -134,7 +134,7 @@ r("R6", "47k", "CHG_PGD", GND, group=g)
 c("C8", "100uF 6.3V", "VSYS", GND, g)
 
 # ---------------------------------------------------------------- Regelung: LM324 aus 5 V, Referenz 2,5 V
-# A: Ladestrom 2,0 A (100 mV über R15‖R16 im Minuspol des Akkus), B: Panel-Arbeitspunkt ~17 V (mit
+# A: Ladestrom 0,5 A (49 mV über R15 im Minuspol des Akkus), B: Panel-Arbeitspunkt ~17 V (mit
 # Steckbrücke JP2 ~9,7 V für ein 12-V-Netzteil), C: Ladesperre bei Frost, D: Heizung. Alles läuft nur, wenn VSOL
 # anliegt: nachts zieht die Regelung keinen Strom aus dem Akku.
 g = "mppt"
@@ -149,8 +149,9 @@ add("U2", "Amplifier_Operational:LM324", "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",
 c("C11", "100nF", "+5V", GND, g)
 add("U4", "pegel:CJ431", SOT23, "CJ431", "JCET CJ431 (2,5 V)", {"1": "VREF", "2": "VREF", "3": GND}, g, lcsc="C3113")
 r("R7", "1k", "+5V", "VREF", group=g)     # CJ431 braucht bis 1 mA, R7 liefert ~2,3 mA
-# A: Integrator, VREF/25 = 100 mV Sollwert gegen den Spannungsabfall am Shunt
-r("R8", "24k", "VREF", "CC_SET", group=g)
+# A: Integrator, VREF · 1k/50,9k = 49 mV Sollwert gegen den Spannungsabfall am Shunt. 0,5 A reichen: mit der
+# Deep-Sleep-Firmware braucht der Sender im Mittel unter 10 mW (verify/winter_variants.py).
+r("R8", "49.9k", "VREF", "CC_SET", group=g)
 r("R9", "1k", "CC_SET", GND, group=g)
 r("R10", "10k", "CC_SET", "CC_INT", group=g)
 c("C12", "100nF", "CC_INT", "CC_OUT", g)
@@ -175,7 +176,6 @@ g = "battery"
 add("J2", "Connector:Screw_Terminal_01x02", TERM2, "AKKU 3,2V", "Klemme 2-pol. 5,08 mm",
     {"1": "BAT_N", "2": "VSYS"}, g, hand=True)
 r("R15", "0.1", "BAT_N", GND, R1206, g)
-r("R16", "0.1", "BAT_N", GND, R1206, g)
 
 # ---------------------------------------------------------------- Frost: NTC am Akku, Ladesperre und Heizung
 # NTC 10k B3950 und Heizwiderstand (z. B. 68 Ω 5 W) sitzen am Akku und hängen an J4. Ohne NTC sieht die
@@ -200,7 +200,7 @@ nmos("Q4", "HEAT_G", "HEAT_N", GND, g, value="HL2310A", lcsc="C7420347")
 g = "12v"
 add("U5", "Regulator_Switching:TPS61040DBV", "Package_TO_SOT_SMD:SOT-23-5", "TPS61040", "TI TPS61040DBVR",
     {"1": "BST_SW", "2": GND, "3": "BST_FB", "4": "SENS_EN", "5": "VSYS"}, g, lcsc="C7722")
-add("L2", "Device:L", L_RADIAL, "10uH", "Bourns RLB0912-100KL (10 µH, 2,5 A)", {"1": "VSYS", "2": "BST_SW"}, g,
+add("L2", "Device:L", L_RADIAL, "10uH", "Bourns RLB0712-100KL (10 µH, 1,1 A)", {"1": "VSYS", "2": "BST_SW"}, g,
     hand=True)
 add("D7", "Device:D_Schottky", SOD123, "B0540W", "B0540W (40 V 0,5 A)", {"1": "V12_RAW", "2": "BST_SW"}, g,
     lcsc="C7420325")

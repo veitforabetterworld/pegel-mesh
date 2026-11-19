@@ -6,7 +6,7 @@ Halbleiter als Level-1-MOSFET bzw. Dioden-Modelle, ICs als Verhaltensmodelle ihr
 
 # ---------------------------------------------------------------- Dioden und MOSFETs
 SPICE_MODELS = """
-.model SS54 D(IS=25u RS=12m N=1.2 BV=42 IBV=1m CJO=400p)
+.model SS34 D(IS=15u RS=20m N=1.2 BV=42 IBV=1m CJO=250p)
 .model B0540W D(IS=1.5u RS=0.15 N=1.05 BV=42 IBV=1m CJO=50p)
 .model B5819W D(IS=3u RS=0.08 N=1.1 BV=42 IBV=1m CJO=110p)
 .model D4148 D(IS=2.5n RS=0.6 N=1.9 BV=100 IBV=1u CJO=2p)
@@ -23,7 +23,7 @@ SPICE_MODELS = """
 """
 
 DIODE_MODEL = {
-    "SS54": "SS54", "B0540W": "B0540W", "B5819W": "B5819W", "1N4148WS": "D4148", "BAV70": "D4148",
+    "SS34": "SS34", "B0540W": "B0540W", "B5819W": "B5819W", "1N4148WS": "D4148", "BAV70": "D4148",
     "10V": "ZEN10", "SMBJ28A": "TVS28", "SMAJ18A": "TVS18A",
 }
 MOS_MODEL = {"2N7002": "N2N7002", "HL2310A": "NHL2310", "AO3401A": "PAO3401"}
@@ -36,7 +36,7 @@ RES_V = {"0603": 75, "1206": 200}
 
 RATINGS = {
     # Dioden (Vr = Sperrspannung, If = Dauerstrom)
-    "SS54": {"Vr": 40, "If": 5.0, "P": 1.5},
+    "SS34": {"Vr": 40, "If": 3.0, "P": 1.0},
     "B0540W": {"Vr": 40, "If": 0.5, "P": 0.5},
     "B5819W": {"Vr": 40, "If": 1.0, "P": 0.5},
     "1N4148WS": {"Vr": 75, "If": 0.15, "P": 0.2},
@@ -50,8 +50,9 @@ RATINGS = {
     "AO3401A": {"Vds": 30, "Vgs": 12, "Id": 4.0, "P": 1.4},
     "HL2310A": {"Vds": 60, "Vgs": 20, "Id": 3.0, "P": 1.2},
     # Spulen (Irms Dauerstrom, Isat Sättigung, DCR) nach Bourns-Datenblatt
-    "RLB0914-150KL": {"Irms": 2.4, "Isat": 5.3, "DCR": 0.060},
-    "RLB0912-100KL": {"Irms": 2.5, "Isat": 3.6, "DCR": 0.043},
+    # Bourns RLB0712 nennt nur einen Nennstrom; er gilt hier auch als Sättigungsstrom (vorsichtig)
+    "RLB0712-150KL": {"Irms": 0.9, "Isat": 0.9, "DCR": 0.090},
+    "RLB0712-100KL": {"Irms": 1.1, "Isat": 1.1, "DCR": 0.070},
     # Sonstiges
     "MKDS": {"I": 17.5, "V": 250},
 }

@@ -18,6 +18,7 @@
 #define TIME_SYNC_RETRY_MS 60000
 
 struct Pending {
+  uint64_t at_s;          // absolute Messzeit, 0 = aus received_ms und age_s
   uint32_t received_ms;
   uint32_t age_s;
   uint16_t level_mm;
@@ -31,15 +32,23 @@ static uint32_t uploaded = 0;
 static int last_http = 0;
 static SemaphoreHandle_t lock;
 
-void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint32_t age_s, uint16_t level_mm) {
+static void push(const Pending& p) {
   xSemaphoreTake(lock, portMAX_DELAY);
   if (queued == QUEUE_LEN) {   // voll: ältesten Wert verwerfen
     memmove(&queue[0], &queue[1], sizeof(Pending) * (QUEUE_LEN - 1));
     queued--;
     dropped++;
   }
-  queue[queued++] = { received_ms, age_s, level_mm, sender_idx };
+  queue[queued++] = p;
   xSemaphoreGive(lock);
+}
+
+void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint32_t age_s, uint16_t level_mm) {
+  push({ 0, received_ms, age_s, level_mm, sender_idx });
+}
+
+void uploader_push_at(uint8_t sender_idx, uint64_t at_s, uint16_t level_mm) {
+  push({ at_s, 0, 0, level_mm, sender_idx });
 }
 
 bool uploader_idle() { return queued == 0 && tracker_uplink_idle(); }
@@ -117,7 +126,8 @@ static bool uploadBatch() {
   String body = "{\"observations\":[";
   for (int k = 0; k < n; k++) {
     char measured[UNIX_ISO_LEN];
-    unix_iso(unix_at(now, now_ms, batch[k].received_ms, batch[k].age_s), measured);
+    uint64_t at = batch[k].at_s ? batch[k].at_s : unix_at(now, now_ms, batch[k].received_ms, batch[k].age_s);
+    unix_iso(at, measured);
     if (k) body += ",";
     body += String("{\"observed_at\":\"") + measured + "\",";
     // Ab PEGEL_STATUS_BASE meldet der Sender einen Fehlercode statt eines Pegels.
