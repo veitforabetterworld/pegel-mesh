@@ -34,4 +34,6 @@ TrackerSettings tracker_uplink_settings(uint8_t idx);
 void tracker_uplink_set(uint8_t idx, const TrackerSettings& s);
 /** Aus dem Uploader-Task: lädt hoch und fragt Einstellungen ab. true, wenn noch Arbeit ansteht. */
 bool tracker_uplink_service();
+// true, wenn keine Meldung auf den Upload wartet.
+bool tracker_uplink_idle();
 void tracker_uplink_status(char* buf, int len);

@@ -17,6 +17,7 @@
 #include <Arduino.h>
 #include <Mesh.h>
 #include <Preferences.h>
+#include <esp_task_wdt.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
@@ -36,6 +37,14 @@
 
 #define STATUS_INTERVAL_MS  60000
 
+// Langzeitbetrieb: Empfangsteil des SX1262 regelmäßig zurücksetzen, Funkchip nach langer Stille neu starten,
+// Watchdog für Schleife und Uploader, Neustart bei zerstückeltem Heap (String/HTTP über Jahre).
+#define AGC_RESET_INTERVAL_MS  (10UL * 60 * 1000)
+#define RADIO_SILENCE_MS       (6UL * 3600 * 1000)
+#define WDT_TIMEOUT_S          90       // länger als die längste HTTP-Folge des Uploaders (2 x 15 s + TLS)
+#define HEAP_RESTART_BLOCK     32000    // TLS braucht 2 x 16 KB: darunter neu starten, sobald nichts wartet
+#define HEAP_CRITICAL_BLOCK    16000    // darunter sofort neu starten
+
 struct Peer {
   mesh::Identity id;
   uint8_t secret[PUB_KEY_SIZE];
@@ -45,7 +54,16 @@ struct Peer {
   uint32_t last_counter;
   uint32_t saved_counter;   // zuletzt in den Flash geschriebener Stand
   bool has_last;
+  uint32_t low_counter;     // Zählerneustart erkennen (ReceiverMesh::counterRestarted)
+  uint32_t low_since;
+  uint16_t low_count;
 };
+
+// Fängt der Zähler eines Senders neu an (Flash verloren, Gerät getauscht), wären alle seine Blöcke "veraltet".
+// Kommen mindestens RESYNC_BLOCKS solcher Blöcke mit steigendem Zähler über mindestens RESYNC_MIN_MS, gilt der
+// neue Stand wie nach creset. Ein Angreifer müsste dafür ebenso viele aufgezeichnete Blöcke in Folge einspielen.
+#define RESYNC_BLOCKS  30
+#define RESYNC_MIN_MS  (30UL * 60 * 1000)
 
 // Der Zählerstand landet nur alle COUNTER_SAVE_STEP Zähler im Flash (NVS): bei jedem Block geschrieben, wären das
 // über 30 Jahre mehrere Millionen Schreibvorgänge je Sender. Nach einem Neustart fehlen höchstens so viele; das
@@ -83,8 +101,11 @@ static void counterKey(char key[4], int i) {
   key[2] = 0;
 }
 
+extern RADIO_CLASS radio;   // aus der MeshCore-Variante (target.cpp)
+
 class ReceiverMesh : public mesh::Mesh {
   Peer peers[PEER_COUNT];
+  uint32_t last_heard = 0;   // millis() des letzten gültigen Pakets eines Peers
   int matches[4];   // Mesh fragt per Index nach; Index -> peers[]
 
   void saveCounter(int i) {
@@ -121,6 +142,29 @@ class ReceiverMesh : public mesh::Mesh {
   void markSeen(int i, uint32_t ctr) { seen[i][(ctr % PGB_COUNTER_WINDOW) / 8] |= (uint8_t)(1 << (ctr % 8)); }
   void unmarkSeen(int i, uint32_t ctr) { seen[i][(ctr % PGB_COUNTER_WINDOW) / 8] &= (uint8_t)~(1 << (ctr % 8)); }
 
+  bool counterRestarted(int i, uint32_t ctr) {
+    Peer& p = peers[i];
+    uint32_t now = millis();
+    if (p.low_count == 0 || ctr <= p.low_counter) {   // neue Folge
+      p.low_count = 0;
+      p.low_since = now;
+    }
+    p.low_counter = ctr;
+    if (p.low_count < 0xFFFF) p.low_count++;
+    return p.low_count >= RESYNC_BLOCKS && now - p.low_since >= RESYNC_MIN_MS;
+  }
+
+  void forgetCounter(int i) {
+    char key[4];
+    counterKey(key, i);
+    prefs.remove(key);
+    peers[i].has_last = false;
+    peers[i].last_counter = 0;
+    peers[i].saved_counter = 0;
+    peers[i].low_count = 0;
+    memset(seen[i], 0, sizeof(seen[i]));
+  }
+
   // true, wenn der Zähler neu ist; schiebt das Fenster bei einem neuen Höchststand weiter.
   bool acceptCounter(int i, uint32_t ctr) {
     Peer& p = peers[i];
@@ -144,9 +188,26 @@ class ReceiverMesh : public mesh::Mesh {
       Serial.printf("sender %s: unreadable block\n", peerName(i));
       return;
     }
-    // Quittung sofort, auf dem bekannten Pfad oder ohne Hops (ein Sender ohne Pfad sendet ohne Hops, ist also
-    // in Reichweite). Nie fluten: das kostete bei jeder Messung Sendezeit im ganzen Netz.
+    last_heard = millis();
     Peer& p = peers[i];
+    // Ganzer Block unter dem Zählerfenster: nicht quittieren, der Sender behält die Messungen. Nur ein
+    // erkannter Zählerneustart lässt ihn durch.
+    if (p.has_last && b.counter < p.last_counter && p.last_counter - b.counter >= PGB_COUNTER_WINDOW) {
+      if (!counterRestarted(i, b.counter)) {
+        rx_rejected += b.n;
+        Serial.printf("sender %s: block #%lu below window (last %lu), not acknowledged\n", peerName(i),
+                      (unsigned long)b.counter, (unsigned long)p.last_counter);
+        return;
+      }
+      Serial.printf("sender %s: counter restarted at %lu, accepted\n", peerName(i), (unsigned long)b.counter);
+      forgetCounter(i);
+    } else {
+      p.low_count = 0;
+    }
+
+    // Quittung sofort, auf dem bekannten Pfad oder ohne Hops (ein Sender ohne Pfad sendet ohne Hops, ist also
+    // in Reichweite). Nie fluten: das kostete bei jeder Messung Sendezeit im ganzen Netz. Doppelte (Quittung
+    // verloren) werden ebenfalls quittiert, sonst schickte der Sender sie immer wieder.
     uint8_t ack[PGB_ACK_LEN];
     pgb_encode_ack(b.tag, ack);
     mesh::Packet* resp = createDatagram(PAYLOAD_TYPE_RESPONSE, p.id, p.secret, ack, sizeof(ack));
@@ -187,6 +248,7 @@ class ReceiverMesh : public mesh::Mesh {
       Serial.printf("tracker %s: unreadable req\n", peerName(i));
       return;
     }
+    last_heard = millis();
     Peer& p = peers[i];
     int t = i - PEGEL_SENDER_COUNT;
     // Quittung sofort: der Tracker wartet mit eingeschaltetem Funk darauf. data beginnt mit dem Tag.
@@ -254,6 +316,7 @@ protected:
   bool onPeerPathRecv(mesh::Packet* packet, int sender_idx, const uint8_t* secret, uint8_t* path, uint8_t path_len,
                       uint8_t extra_type, uint8_t* extra, uint8_t extra_len) override {
     int i = matches[sender_idx];
+    last_heard = millis();
     peers[i].path_len = mesh::Packet::copyPath(peers[i].path, path, path_len);
     peers[i].has_path = true;
     Serial.printf("path to %s learned: %u hop(s)\n", peerName(i), (unsigned)(path_len & 63));
@@ -279,17 +342,23 @@ protected:
     Serial.printf("REQ %s from %s, answered\n", packet->isRouteFlood() ? "flood" : "direct", peerName(i));
   }
 
+  int getAGCResetInterval() const override { return AGC_RESET_INTERVAL_MS; }
+
 public:
+  // Seit Stunden kein Paket: Funkchip neu starten (falls er hängt; ohne Sender in Reichweite kostet es nichts).
+  void maintain() {
+    uint32_t now = millis();
+    if ((int32_t)(now - (last_heard + RADIO_SILENCE_MS)) < 0) return;
+    last_heard = now;
+    Serial.printf("no packet for %lu h: radio restart %s\n", RADIO_SILENCE_MS / 3600000UL,
+                  radio.std_init() ? "ok" : "failed");
+    radio_driver.resetAGC();
+  }
+
   bool resetCounter(const char* name) {
     for (int i = 0; i < PEGEL_SENDER_COUNT; i++) {
       if (strcmp(name, PEGEL_SENDER_NAMES[i]) != 0) continue;
-      char key[4];
-      counterKey(key, i);
-      prefs.remove(key);
-      peers[i].has_last = false;
-      peers[i].last_counter = 0;
-      peers[i].saved_counter = 0;
-      memset(seen[i], 0, sizeof(seen[i]));
+      forgetCounter(i);
       return true;
     }
     return false;
@@ -312,9 +381,13 @@ public:
       p.has_last = prefs.isKey(key);
       p.last_counter = prefs.getUInt(key, 0);
       p.saved_counter = p.last_counter;
+      p.low_counter = 0;
+      p.low_since = 0;
+      p.low_count = 0;
     }
     memset(seen, 0, sizeof(seen));
     mesh::Mesh::begin();
+    last_heard = millis();
     Serial.printf("pegel receiver up, %d sender(s), %d tracker(s) known\n", PEGEL_SENDER_COUNT, TRACKER_COUNT);
   }
 };
@@ -373,6 +446,8 @@ static void pollSerial() {
 }
 
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT_S, true);   // stellt den schon laufenden Task-Watchdog um
+  enableLoopWDT();                          // loop() bedient ihn bei jedem Durchlauf
   Serial.begin(115200);
   delay(2000);   // USB-CDC: dem Host Zeit zum Verbinden lassen, sonst gehen die Startmeldungen verloren
   Serial.println("pegel receiver booting");
@@ -388,6 +463,7 @@ void setup() {
 
 void loop() {
   the_mesh.loop();
+  the_mesh.maintain();
   rtc_clock.tick();
   pollSerial();
 
@@ -397,7 +473,18 @@ void loop() {
     char up[96], trk[64];
     uploader_status(up, sizeof(up));
     tracker_uplink_status(trk, sizeof(trk));
-    Serial.printf("status: up %lus rx_ok=%lu rx_rejected=%lu trk_ok=%lu %s %s\n", (unsigned long)(millis() / 1000),
-                  (unsigned long)rx_ok, (unsigned long)rx_rejected, (unsigned long)trk_ok, up, trk);
+    // Interner RAM: WLAN und TLS brauchen ihn, das PSRAM zählt hier nicht.
+    size_t heap_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    Serial.printf("status: up %lus rx_ok=%lu rx_rejected=%lu trk_ok=%lu heap=%u/%u %s %s\n",
+                  (unsigned long)(millis() / 1000), (unsigned long)rx_ok, (unsigned long)rx_rejected,
+                  (unsigned long)trk_ok, (unsigned)heap_block, (unsigned)heap_free, up, trk);
+    // Zerstückelter Heap: neu starten, bevor eine Zuweisung im Uploader scheitert. Verloren gehen dabei nur
+    // Pfade und das Duplikatfenster; wartende Uploads nur im kritischen Fall.
+    if (heap_block < HEAP_CRITICAL_BLOCK || (heap_block < HEAP_RESTART_BLOCK && uploader_idle())) {
+      Serial.printf("heap fragmented (largest block %u): restart\n", (unsigned)heap_block);
+      Serial.flush();
+      ESP.restart();
+    }
   }
 }

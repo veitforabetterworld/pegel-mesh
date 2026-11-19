@@ -79,16 +79,11 @@ Der Sender hält jede Messung im RAM, bis der Empfänger sie quittiert: 6144 Mes
 - Kam die Quittung, folgt der restliche Stau Block für Block, neueste zuerst, solange das Sendebudget von 1 % je Stunde reicht (MeshCore setzt es durch). Ein Tag Ausfall von Sender A ist so in knapp einer Stunde nachgeholt.
 - Daten und Quittungen laufen nur auf dem bekannten Pfad oder ohne Hops, nie geflutet.
 
-Nach einem Tausch oder Neuaufsetzen eines Senders fängt sein Zähler wieder klein an; der Empfänger lehnt dessen Messungen dann als veraltet ab. Abhilfe: am Empfänger über USB-Serial `creset <Sender>` eingeben, z. B. `creset A`.
+Fängt der Zähler eines Senders neu an (Tausch, Neuaufsetzen), übernimmt der Empfänger den neuen Stand nach etwa 30 Blöcken; sofort geht es am Empfänger über USB-Serial mit `creset <Sender>`, z. B. `creset A`.
 
-## Langzeitbetrieb (Zeitgrenzen)
+## Langzeitbetrieb
 
-| Gerät | Grenze | Grund |
-|---|---|---|
-| Sender | keine | kennt keine Uhrzeit, nur Abstände (über den `millis()`-Überlauf alle 49,7 Tage hinweg gerechnet); der 32-Bit-Zähler reicht bei einer Messung je Minute rund 8000 Jahre |
-| Empfänger | Jahr 9999 | eigene Uhr in [`receiver/unix_time.h`](firmware/receiver/unix_time.h): 64-Bit-Sekunden, gestellt aus dem `Date`-Header jeder API-Antwort, fortgeschrieben mit dem 64-Bit-Timer des ESP32; das Datumsformat ist vierstellig |
-
-Die Systemzeit des ESP-IDF 4.4 (Arduino-ESP32 2.x) nutzt der Empfänger dafür nicht: `time_t` ist dort 32 Bit (Überlauf 2038, als `uint32` gelesen 2106), und lwIP deutet die NTP-Zeitstempel nur für 1968 bis Februar 2104 richtig. SNTP dient nur bis zur ersten Server-Antwort; ist es unbrauchbar, fragt der Empfänger einmal je Minute `GET /v1/health` nach der Uhrzeit. Ohne gültige Zeit lädt er nichts hoch (keine falschen Zeitstempel). Die Hardware (ESP32-S3, nRF52840) setzt keine Grenze; der Server (Postgres, Node.js) rechnet weit über 2106 hinaus. PC-Test der Datumsrechnung bis 9999: [`firmware/test/test_unix_time.cpp`](firmware/test/test_unix_time.cpp).
+Die Firmware ist für den Betrieb über viele Jahrzehnte ausgelegt (Watchdog, Überlauf- und Verschleißschutz). Der Empfänger nimmt die Uhrzeit vom Server.
 
 ## GPS-Tracker
 

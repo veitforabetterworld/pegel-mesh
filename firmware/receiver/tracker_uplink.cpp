@@ -84,6 +84,8 @@ void tracker_uplink_push(const TrackerUpload& u) {
   xSemaphoreGive(lock);
 }
 
+bool tracker_uplink_idle() { return queued == 0; }
+
 void tracker_uplink_status(char* buf, int len) {
   snprintf(buf, len, "trk_queued=%d trk_uploaded=%lu trk_dropped=%lu", queued, (unsigned long)uploaded,
            (unsigned long)dropped);
@@ -235,5 +237,6 @@ TrackerSettings tracker_uplink_settings(uint8_t) { return trk_default_settings()
 void tracker_uplink_set(uint8_t, const TrackerSettings&) {}
 bool tracker_uplink_service() { return false; }
 void tracker_uplink_status(char* buf, int len) { if (len) buf[0] = 0; }
+bool tracker_uplink_idle() { return true; }
 
 #endif

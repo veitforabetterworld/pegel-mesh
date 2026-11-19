@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_task_wdt.h>
 #include "unix_time.h"
 
 #include "secrets_receiver.h"
@@ -40,6 +41,8 @@ void uploader_push(uint8_t sender_idx, uint32_t received_ms, uint32_t age_s, uin
   queue[queued++] = { received_ms, age_s, level_mm, sender_idx };
   xSemaphoreGive(lock);
 }
+
+bool uploader_idle() { return queued == 0 && tracker_uplink_idle(); }
 
 void uploader_status(char* buf, int len) {
   // wl_status_t: 1 SSID not found, 4 connect failed (password), 6 disconnected.
@@ -174,6 +177,7 @@ static void syncTime() {
 }
 
 static void uploaderTask(void*) {
+  esp_task_wdt_add(nullptr);   // hängt ein HTTP-Aufruf, startet der Watchdog den Empfänger neu
   WiFi.mode(WIFI_STA);
   logScan();
   WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
@@ -183,6 +187,7 @@ static void uploaderTask(void*) {
   uint32_t time_sync_at = 0;
   bool pegel_on = strlen(PEGEL_API_URL) > 0 && strlen(PEGEL_API_KEY) > 0;
   for (;;) {
+    esp_task_wdt_reset();
     if (WiFi.status() != WL_CONNECTED && (int32_t)(millis() - next_scan) >= 0) {
       next_scan = millis() + 60000;
       logScan();

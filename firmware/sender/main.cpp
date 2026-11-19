@@ -46,10 +46,27 @@ using namespace Adafruit_LittleFS_Namespace;
 // MeshCore begrenzt die Sendezeit auf 1 / (1 + Faktor) je Stunde: 99 ergibt 1 %.
 #define PEGEL_AIRTIME_FACTOR  99.0f
 
+// Langzeitbetrieb: das Empfangsteil des SX1262 regelmäßig zurücksetzen (wie die MeshCore-Repeater), den Funkchip
+// nach langer Stille ganz neu starten, und ein Watchdog, der eine hängende Firmware neu startet.
+#define AGC_RESET_INTERVAL_MS   (10UL * 60 * 1000)
+#define RADIO_SILENCE_MS        (6UL * 3600 * 1000)   // so lange keine Antwort vom Empfänger: Funkchip neu starten
+#define WDT_TIMEOUT_S           120                    // länger als ein Firmware-Update per USB (ca. 40 s)
+
 #define CTR_FILE       "/pegel_ctr"
 #define CTR_SAVE_STEP  256   // Zähler nur alle 256 Pakete in den Flash schreiben
 
 static bool due(uint32_t now, uint32_t t) { return (int32_t)(now - t) >= 0; }
+
+// Hardware-Watchdog des nRF52840; läuft auch im Schlaf. Einmal gestartet, hält ihn nur ein Reset an (nach einem
+// Soft-Reset läuft er weiter, dann bleibt die Einstellung).
+static void wdtBegin() {
+  if (NRF_WDT->RUNSTATUS) return;
+  NRF_WDT->CONFIG = (WDT_CONFIG_SLEEP_Run << WDT_CONFIG_SLEEP_Pos) | (WDT_CONFIG_HALT_Pause << WDT_CONFIG_HALT_Pos);
+  NRF_WDT->CRV = WDT_TIMEOUT_S * 32768UL;
+  NRF_WDT->RREN = WDT_RREN_RR0_Msk;
+  NRF_WDT->TASKS_START = 1;
+}
+static void wdtFeed() { NRF_WDT->RR[0] = WDT_RR_RR_Reload; }
 
 // Log über USB, ohne zu blockieren: ist ein Host verbunden, der nicht mitliest, wird die Zeile verworfen,
 // statt den Sender anzuhalten (sonst bleibt der Sendetakt stehen).
@@ -66,6 +83,7 @@ static void logf(const char* fmt, ...) {
 }
 
 static Backlog backlog;
+extern RADIO_CLASS radio;   // aus der MeshCore-Variante (target.cpp)
 
 static uint32_t loadCounter() {
   uint32_t c = 0;
@@ -108,6 +126,7 @@ class SenderMesh : public mesh::Mesh {
   uint8_t block_n = 0;
   uint32_t block_deadline = 0;
   uint32_t next_backlog = 0;
+  uint32_t last_heard = 0;       // millis() der letzten Antwort des Empfängers
   uint16_t bat_mv = 0;
 
 #if PEGEL_BOARD
@@ -130,7 +149,10 @@ class SenderMesh : public mesh::Mesh {
     level_sensor_power(false);
     radio_driver.powerOff();
     while (true) {
-      delay(30UL * 60 * 1000);
+      for (int i = 0; i < 30; i++) {   // 30 min, minütlich den Watchdog bedienen
+        delay(60000);
+        wdtFeed();
+      }
       uint16_t mv;
       if (battery_read(mv) && mv >= PEGEL_BATTERY_OK_MV) NVIC_SystemReset();
     }
@@ -233,6 +255,7 @@ protected:
     out_path_len = mesh::Packet::copyPath(out_path, path, path_len);
     have_path = true;
     awaiting_reply = false;
+    last_heard = millis();
     next_check = millis() + PATH_CHECK_INTERVAL_MS;
     logf("path to receiver learned: %u hop(s)\n", (unsigned)(path_len & 63));
     return true;   // Mesh schickt dem Empfänger daraufhin den Rückweg
@@ -241,6 +264,7 @@ protected:
   void onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender_idx, const uint8_t* secret,
                       uint8_t* data, size_t len) override {
     if (type != PAYLOAD_TYPE_RESPONSE) return;
+    last_heard = millis();
     if (block_in_flight && pgb_is_ack(data, (int)len, block_tag)) {
       backlog.remove(block_counter, block_n);
       block_in_flight = false;
@@ -257,6 +281,7 @@ protected:
   }
 
   float getAirtimeBudgetFactor() const override { return PEGEL_AIRTIME_FACTOR; }
+  int getAGCResetInterval() const override { return AGC_RESET_INTERVAL_MS; }
 
 public:
   SenderMesh(mesh::Radio& radio, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
@@ -273,6 +298,7 @@ public:
 
     mesh::Mesh::begin();
     uint32_t now = millis();
+    last_heard = now;
     next_check = now + 3000;
     next_send = now + 5000;
     logf("pegel sender %s, interval %u s, counter %lu\n", PEGEL_SENDER_NAME, PEGEL_INTERVAL_S,
@@ -280,8 +306,18 @@ public:
   }
 
   void loop() {
+    wdtFeed();
     mesh::Mesh::loop();
     uint32_t now = millis();
+
+    // Seit Stunden keine Antwort: vielleicht ist nur der Empfänger weg, vielleicht hängt der Funkchip. Ein
+    // Neustart des Chips kostet nichts; der Stau bleibt erhalten.
+    if (due(now, last_heard + RADIO_SILENCE_MS) && !block_in_flight) {
+      last_heard = now;
+      logf("no reply for %lu h: radio restart %s\n", RADIO_SILENCE_MS / 3600000UL,
+           radio.std_init() ? "ok" : "failed");
+      radio_driver.resetAGC();
+    }
 
     if (awaiting_reply && due(now, reply_deadline)) {
       awaiting_reply = false;
@@ -362,7 +398,6 @@ public:
 // Wie radio_init() der Variante, aber ohne rtc_clock.begin(Wire): I²C liegt beim XIAO auf D6/D7, dort hängt
 // RS485. Bei ausgeschalteter Sonde zieht der unversorgte SP3485 RX auf GND, die RTC-Suche hängt dann für immer.
 // Der Sender braucht keine RTC; rtc_clock nutzt ohne begin() die interne Uhr.
-extern RADIO_CLASS radio;
 static bool sender_radio_init() { return radio.std_init(&SPI); }
 
 StdRNG fast_rng;
@@ -370,6 +405,7 @@ SimpleMeshTables tables;
 SenderMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables);
 
 void setup() {
+  wdtBegin();
   Serial.begin(115200);
   board.begin();
   if (!sender_radio_init()) {
