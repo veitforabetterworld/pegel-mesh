@@ -14,7 +14,7 @@
 #define QUEUE_LEN        1024   // reicht für ~17 h von Sender A ohne Verbindung
 #define BATCH_MAX        60
 #define RETRY_DELAY_MS   30000
-#define TIME_VALID_AFTER 1700000000UL   // vor NTP-Sync steht die Uhr bei 1970
+#define TIME_SYNC_RETRY_MS 60000
 
 struct Pending {
   uint32_t received_ms;
@@ -62,7 +62,12 @@ int uploader_http(const char* method, const String& url, const char* api_key, co
   http.setTimeout(15000);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-API-Key", api_key);
+  static const char* keep[] = { "Date" };
+  http.collectHeaders(keep, 1);
   int code = http.sendRequest(method, body);
+  // Jede Antwort stellt die Uhr (unix_time.h), auch eine Fehlerantwort.
+  uint64_t server_time;
+  if (code > 0 && unix_parse_http_date(http.header("Date").c_str(), server_time)) unix_sync(server_time);
   if (code < 200 || code >= 300) {
     Serial.printf("HTTP %s %s -> %d %s\n", method, url.c_str(), code, http.getString().c_str());
   } else if (response) {
@@ -104,13 +109,14 @@ static bool uploadBatch() {
   xSemaphoreGive(lock);
   if (n == 0) return false;
 
-  uint32_t now = unix_now();
+  uint64_t now = unix_now();
   uint32_t now_ms = millis();
   String body = "{\"observations\":[";
   for (int k = 0; k < n; k++) {
-    uint32_t measured = unix_at(now, now_ms, batch[k].received_ms, batch[k].age_s);
+    char measured[UNIX_ISO_LEN];
+    unix_iso(unix_at(now, now_ms, batch[k].received_ms, batch[k].age_s), measured);
     if (k) body += ",";
-    body += "{\"observed_at\":\"" + unix_iso(measured) + "\",";
+    body += String("{\"observed_at\":\"") + measured + "\",";
     // Ab PEGEL_STATUS_BASE meldet der Sender einen Fehlercode statt eines Pegels.
     if (batch[k].level_mm >= PEGEL_STATUS_BASE) body += "\"status\":" + String(batch[k].level_mm - PEGEL_STATUS_BASE) + "}";
     else body += "\"water_level\":" + String(batch[k].level_mm / 1000.0f, 3) + "}";
@@ -158,6 +164,15 @@ static void logScan() {
   WiFi.scanDelete();
 }
 
+// Holt die Uhrzeit vom Server, solange sie unbekannt ist (SNTP fehlt oder ist nach 2104 falsch).
+static void syncTime() {
+  const char* url = PEGEL_API_URL;
+#if TRACKER_COUNT > 0 && defined(TRACKER_API_URL)
+  if (strlen(url) == 0) url = TRACKER_API_URL;
+#endif
+  if (strlen(url) > 0) uploader_http("GET", String(url) + "/v1/health", "", "", nullptr);
+}
+
 static void uploaderTask(void*) {
   WiFi.mode(WIFI_STA);
   logScan();
@@ -165,6 +180,7 @@ static void uploaderTask(void*) {
   configTime(0, 0, "pool.ntp.org", "time.google.com");
   uint32_t next_scan = millis() + 60000;
   uint32_t pegel_retry_at = 0;
+  uint32_t time_sync_at = 0;
   bool pegel_on = strlen(PEGEL_API_URL) > 0 && strlen(PEGEL_API_KEY) > 0;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && (int32_t)(millis() - next_scan) >= 0) {
@@ -172,7 +188,15 @@ static void uploaderTask(void*) {
       logScan();
       WiFi.begin(PEGEL_WIFI_SSID, PEGEL_WIFI_PASS);
     }
-    if (WiFi.status() != WL_CONNECTED || unix_now() < TIME_VALID_AFTER) {
+    if (WiFi.status() != WL_CONNECTED) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+    if (unix_now() == 0) {
+      if ((int32_t)(millis() - time_sync_at) >= 0) {
+        time_sync_at = millis() + TIME_SYNC_RETRY_MS;
+        syncTime();
+      }
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }

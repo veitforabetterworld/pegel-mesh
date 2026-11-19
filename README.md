@@ -86,10 +86,9 @@ Nach einem Tausch oder Neuaufsetzen eines Senders fängt sein Zähler wieder kle
 | Gerät | Grenze | Grund |
 |---|---|---|
 | Sender | keine | kennt keine Uhrzeit, nur Abstände (über den `millis()`-Überlauf alle 49,7 Tage hinweg gerechnet); der 32-Bit-Zähler reicht bei einer Messung je Minute rund 8000 Jahre |
-| Empfänger | **Februar 2104** | Zeit per SNTP: das NTP-Protokoll zählt in 136-Jahre-Epochen, lwIP (ESP-IDF) deutet die Zeitstempel nur für 1968–2104 richtig |
-| Empfänger | 7. Februar 2106 | ESP-IDF 4.4 (Arduino-ESP32 2.x) hat 32-Bit-`time_t` und setzt die Systemzeit als `uint32`; die Firmware liest sie vorzeichenlos (`receiver/unix_time.h`), dadurch hält sie über 2038 hinaus bis 2106 |
+| Empfänger | Jahr 9999 | eigene Uhr in [`receiver/unix_time.h`](firmware/receiver/unix_time.h): 64-Bit-Sekunden, gestellt aus dem `Date`-Header jeder API-Antwort, fortgeschrieben mit dem 64-Bit-Timer des ESP32; das Datumsformat ist vierstellig |
 
-Die Hardware (ESP32-S3, nRF52840) setzt keine Grenze; es ist nur die Software des Empfängers. Danach hält der Empfänger die Uhr für ungültig und lädt nichts mehr hoch (keine falschen Zeitstempel). Abhilfe per Firmware-Update des Empfängers vor 2104: Uhrzeit nicht per SNTP, sondern aus dem `Date`-Header der API-Antworten holen und als 64-Bit-Sekunden plus `millis()` selbst führen, oder auf ein ESP-IDF mit 64-Bit-`time_t` und angepasster SNTP-Epoche wechseln. Der Server (Postgres, Node.js) rechnet weit über 2106 hinaus.
+Die Systemzeit des ESP-IDF 4.4 (Arduino-ESP32 2.x) nutzt der Empfänger dafür nicht: `time_t` ist dort 32 Bit (Überlauf 2038, als `uint32` gelesen 2106), und lwIP deutet die NTP-Zeitstempel nur für 1968 bis Februar 2104 richtig. SNTP dient nur bis zur ersten Server-Antwort; ist es unbrauchbar, fragt der Empfänger einmal je Minute `GET /v1/health` nach der Uhrzeit. Ohne gültige Zeit lädt er nichts hoch (keine falschen Zeitstempel). Die Hardware (ESP32-S3, nRF52840) setzt keine Grenze; der Server (Postgres, Node.js) rechnet weit über 2106 hinaus. PC-Test der Datumsrechnung bis 9999: [`firmware/test/test_unix_time.cpp`](firmware/test/test_unix_time.cpp).
 
 ## GPS-Tracker
 

@@ -142,26 +142,27 @@ static bool uploadBatch() {
   const char* api_key = TRACKER_API_KEYS[idx];
   bool no_key = strlen(api_key) == 0;   // ohne Key: verwerfen statt ewig stauen
   if (!no_key) {
-    uint32_t now = unix_now();
+    uint64_t now = unix_now();
     uint32_t now_ms = millis();
     String body = "{\"reports\":[";
     for (int k = 0; k < n; k++) {
       const TrackerUpload& u = batch[k];
       const TrackerRecord& r = u.rec;
       // Zeitpunkt des Eintrags: Empfang der REQ minus Alter des Eintrags.
-      String when = unix_iso(unix_at(now, now_ms, u.received_ms, r.age_s));
+      char when[UNIX_ISO_LEN];
+      unix_iso(unix_at(now, now_ms, u.received_ms, r.age_s), when);
       char item[400];
       int w = snprintf(item, sizeof(item),
                        "%s{\"counter\":%lu,\"received_at\":\"%s\",\"alarm\":%s,\"motion\":%s,\"charging\":%s,\"usb\":%s,"
                        "\"settings_version\":%u,\"snr\":%.2f,\"rssi\":%.1f",
-                       k ? "," : "", (unsigned long)r.counter, when.c_str(), (r.flags & TRK_R_ALARM) ? "true" : "false",
+                       k ? "," : "", (unsigned long)r.counter, when, (r.flags & TRK_R_ALARM) ? "true" : "false",
                        (r.flags & TRK_R_MOTION) ? "true" : "false", u.charging ? "true" : "false",
                        u.usb ? "true" : "false", u.settings_version, u.snr, u.rssi);
       if (w < 0 || w >= (int)sizeof(item)) w = sizeof(item) - 1;
       if (r.flags & TRK_R_FIX) {
         w += snprintf(item + w, sizeof(item) - w,
                       ",\"position\":{\"observed_at\":\"%s\",\"lat\":%.7f,\"lon\":%.7f,\"alt_m\":%d,\"sats\":%u,\"hdop\":%.1f}",
-                      when.c_str(), r.lat_e7 / 1e7, r.lon_e7 / 1e7, r.alt_m, r.sats, r.hdop_x10 / 10.0);
+                      when, r.lat_e7 / 1e7, r.lon_e7 / 1e7, r.alt_m, r.sats, r.hdop_x10 / 10.0);
       }
       if (w < 0 || w >= (int)sizeof(item)) w = sizeof(item) - 1;
       if (u.batt_mv) w += snprintf(item + w, sizeof(item) - w, ",\"battery_mv\":%u", u.batt_mv);
