@@ -28,7 +28,7 @@ Schaltplan: [`hardware/pegel-sender/preview/`](hardware/pegel-sender/preview/) (
 | Klemme | Was |
 |---|---|
 | **SOLAR/12V** | 12-V-Solarpanel (Leerlauf ≤ 25 V; 10 W Flachland, 30 W Mittelgebirge) **oder** 12-V-Netzteil |
-| **AKKU** | LiFePO4, **1 Zelle** (3,2 V), z. B. 2–3 × 6 Ah parallel. 5-A-Sicherung im Pluskabel |
+| **AKKU** | LiFePO4, **1 Zelle** (3,2 V), z. B. 2–3 × 6 Ah parallel. Rückstellende Sicherung **RUEF300** (Littelfuse PolySwitch, hält 3 A, löst bei 6 A aus) im Pluskabel, direkt am Akku-Pluspol |
 | **HEIZ/NTC** | H+ / H−: Heizwiderstand 68 Ω 10 W; NTC / NTC: Fühler 10 kΩ B3950, **auf den Akku** kleben |
 | **SONDE** | V+ rot, V− schwarz, A weiß, B blau. RS485 Modbus RTU, 9600 8N1, Adresse 1, 12 V ≤ 30 mA |
 | **NETZTEIL** (Brücke) | gesteckt bei Netzteil, offen bei Solarpanel |
