@@ -8,6 +8,8 @@ Alles läuft auf Windows mit dem ngspice aus KiCad (`ngspice.dll` über ctypes),
 | `sweeps.py` | Temperatur- und Netzteilrampen (Hysterese in beide Richtungen), Einschalten der Sonde bei voller und fast leerer Zelle | `report/sweeps.md` + Bilder |
 | `longterm.py` | Mehrere Tage Winter und Sommer, quasistatisch alle 20 min, Ladezustand integriert | `report/longterm.md` + Bilder |
 | `winter_energy.py` | Panel- und Akkugröße über 18 Winter (PVGIS stündlich), Verschattung, Heizung, Ladesperre; Argumente `mittelgebirge`/`flachland` und Messabstand in s | Konsole |
+| `winter_variants.py` | Wie `winter_energy.py`, aber Deep-Sleep-Firmware und kleine Ladetechnik: 6-V-Modul mit LiFePO4-Lader (NTC, keine Heizung) gegen 5-V-USB-Panel am XIAO-Lader (Li-Ionen); Argumente Region, Messabstand in s, Sondenleistung in mW | Konsole |
+| `winter_liion.py` | Li-Ionen am Lader des XIAO (5-V-USB-Panel, Ladesperre per Firmware), kleine Akkuheizung aus dem Panel, 3 cm Dämmung, Selbstentladung und Kälteverlust; gleiche Argumente | Konsole |
 | `pcb_check.py` | Breitester Kupferweg jedes Hochstrompfads gegen IPC-2221 (KiCad-Python) | `report/pcb.md` |
 | `../../../firmware/test` | Firmware gegen nachgebildete Modbus-Sonde an `Serial1` und den SAADC an VDD (g++) | Konsole |
 
