@@ -2,7 +2,7 @@
 
 Träger für XIAO nRF52840 + Wio-SX1262: Laden aus Solar oder 12-V-Netzteil, LiFePO4 1S, 12 V für die Pegelsonde (nur bei Messung), RS485 zur Sonde, Frostschutz mit Heizung am Akku. Platine 100 × 70 mm, 2 Lagen, für IP65-Gehäuse ~115 × 90 mm. Auslegung und Anschluss für Anwender: [README im Repo-Root](../../README.md).
 
-Bilder: [`preview/`](preview/) — Blockschaltplan (`pegel-sender-12v-schematic-blocks.png`), 3D-Ansichten (`pegel-sender-12v-top.png`, `pegel-sender-12v-bottom.png`) und Schaltplan je Funktionsblock (`schematic-*.png`). Simulation und Prüfung: [`verify/`](verify/README.md).
+Bilder: [`preview/`](preview/) — Blockschaltplan (`pegel-sender-12v-schematic-blocks.png`), 3D-Ansichten (`pegel-sender-12v-top.png`, `pegel-sender-12v-bottom.png`) und Schaltplan je Funktionsblock (`schematic-*.png`). CAD: [`pegel-sender-12v.sc`](pegel-sender-12v.sc) (SolidCraft) und [`pegel-sender-12v.step`](pegel-sender-12v.step). Simulation und Prüfung: [`verify/`](verify/README.md).
 
 ## Schaltung
 
