@@ -1,9 +1,0 @@
-Designator,Wert,Teil,Footprint
-J1,5V IN,"Lötanschluss 2 x 2,54 mm",PinHeader_1x02_P2.54mm_Vertical
-J4,NTC,"NTC 10 kΩ B3950 bedrahtet, am Akku",PinHeader_1x02_P2.54mm_Vertical
-J2,AKKU Li-Ion,"Lötanschluss 2 x 2,54 mm",PinHeader_1x02_P2.54mm_Vertical
-J7,XIAO BAT,"Lötanschluss 2 x 2,54 mm (Drähte zu BAT+/BAT- des XIAO)",PinHeader_1x02_P2.54mm_Vertical
-L1,10uH,"Bourns RLB0712-100KL (10 µH, 1,1 A)",L_Radial_D7.0mm_P3.00mm
-J3,SONDE,"Lötanschluss 4 x 2,54 mm",PinHeader_1x04_P2.54mm_Vertical
-J5,XIAO D0-D6,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical
-J6,XIAO 5V-D7,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical

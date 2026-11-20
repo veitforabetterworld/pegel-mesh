@@ -2,18 +2,18 @@
 
 Wasserstände von entfernten Pegeln per Funk ins Netz, ohne Mobilfunk. Ein Sender am Fluss liest die Pegelsonde (RS485) und funkt über [MeshCore](https://github.com/meshcore-dev/MeshCore) (868 MHz) zu einem Empfänger mit WLAN, der die Werte an die **hochwasserdienst**-API schickt. Der Sender läuft mit Solarpanel und Akku.
 
-![Trägerplatine](hardware/pegel-sender/preview/pegel-sender-top.png)
+![Trägerplatine](hardware/pegel-sender-12v/preview/pegel-sender-12v-top.png)
 
 Zwei Trägerplatinen, eine Firmware (gleiche XIAO-Pins; die Firmware erkennt den Akku selbst):
 
 | Platine | Akku | Versorgung |
 |---|---|---|
-| [`pegel-sender`](hardware/pegel-sender/README.md) (v1, 100 × 70 mm) | LiFePO4 oder ohne | Solarpanel 12-V-Klasse oder 12-V-Netzteil |
-| [`pegel-sender-v2`](hardware/pegel-sender-v2/README.md) (70 × 40 mm) | Li-Ionen oder ohne | USB-C-Netzteil oder USB-C-Solarpanel (5 V) |
+| [`pegel-sender-12v`](hardware/pegel-sender-12v/README.md) (100 × 70 mm) | LiFePO4 oder ohne | Solarpanel 12-V-Klasse oder 12-V-Netzteil |
+| [`pegel-sender-5v`](hardware/pegel-sender-5v/README.md) (58 × 46 mm) | Li-Ionen oder ohne | USB-C-Netzteil oder USB-C-Solarpanel (5 V), Heizung 1,7 W |
 
-## Platine (v1)
+## Platine (12 V)
 
-Die SMD-Teile bestückt JLCPCB (Dateien in [`hardware/pegel-sender/fab/`](hardware/pegel-sender/fab/)). Selbst löten:
+Die SMD-Teile bestückt JLCPCB (Dateien in [`hardware/pegel-sender-12v/fab/`](hardware/pegel-sender-12v/fab/)). Selbst löten:
 
 | Teil | Wert | Beispiel |
 |---|---|---|
@@ -28,7 +28,7 @@ Die SMD-Teile bestückt JLCPCB (Dateien in [`hardware/pegel-sender/fab/`](hardwa
 
 Elkos: Plus an das Pad mit „+“.
 
-Schaltplan: [`hardware/pegel-sender/preview/`](hardware/pegel-sender/preview/) (Blockschaltbild und ein Blatt je Funktionsblock), Technik in [`hardware/pegel-sender/`](hardware/pegel-sender/README.md).
+Schaltplan: [`hardware/pegel-sender-12v/preview/`](hardware/pegel-sender-12v/preview/) (Blockschaltbild und ein Blatt je Funktionsblock), Technik in [`hardware/pegel-sender-12v/`](hardware/pegel-sender-12v/README.md).
 
 ## Anschlüsse
 

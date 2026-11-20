@@ -1,0 +1,15 @@
+#VRML V2.0 utf8
+# Wio-SX1262 grobe Box 17.5 x 21 x 7 mm über dem XIAO (Vorschau)
+Transform {
+  translation 0 0 0
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.2 0.35 0.2
+        }
+      }
+      geometry Box { size 17.5 21 7 }
+    }
+  ]
+}

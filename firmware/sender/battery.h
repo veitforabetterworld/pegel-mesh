@@ -1,10 +1,10 @@
 #pragma once
 // Akkuspannung und Unterspannung. Eine Firmware für beide Trägerplatinen (gleiche Pinbelegung):
 //
-//   pegel-sender (alt): LiFePO4 speist den XIAO über D10 (B5819W) direkt an 3V3, BAT des XIAO bleibt offen. Die
+//   pegel-sender-12v:   LiFePO4 speist den XIAO über D10 (B5819W) direkt an 3V3, BAT des XIAO bleibt offen. Die
 //                       Firmware misst ihre eigene Versorgung VDD und rechnet die Durchlassspannung dazu.
-//   pegel-sender-v2:    Li-Ionen am BAT des XIAO (Lader BQ25101 auf dem XIAO), dessen Regler macht 3,3 V.
-//                       Akku über den Teiler 1 MΩ / 510 kΩ an P0.31 (P0.14 low).
+//   pegel-sender-5v:    Li-Ion nur am BAT des XIAO (BQ25101). 5 V von J1 über Q10 an den XIAO-5V-Pin,
+//                       Heizung Q9 dagegen (P0.09). Akku P0.31-Teiler wie 12 V.
 //
 // battery_read() erkennt die Art bei jeder Messung: liegen an BAT mehr als 2,5 V, ist es Li-Ionen. (Am alten Board
 // misst es so nur, solange USB am XIAO steckt: dann sieht es die Laderspannung des XIAO, harmlos.)
@@ -47,5 +47,5 @@ inline bool battery_cutoff(uint16_t millivolt, BatteryKind kind) { return milliv
 // millivolt und kind unverändert).
 bool battery_read(uint16_t& millivolt, BatteryKind& kind);
 
-// Ladestrom des XIAO-Laders auf 100 mA (pegel-sender-v2); am alten Board ohne Wirkung.
+// Ladestrom des XIAO-Laders auf 100 mA (pegel-sender-5v); an der 12-V-Variante ohne Wirkung.
 void battery_charger_begin();

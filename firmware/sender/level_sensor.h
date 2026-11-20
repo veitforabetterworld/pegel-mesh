@@ -2,7 +2,7 @@
 // Pegelsonde über RS485 / Modbus RTU (wie water-level-sensor.ino): Funktion 3, ein Holding-Register,
 // Wert in cm.
 //
-// PEGEL_BOARD=1, Trägerplatine pegel-sender (hardware/pegel-sender):
+// PEGEL_BOARD=1, Trägerplatine pegel-sender-12v oder pegel-sender-5v (hardware/pegel-sender-12v, -5v):
 //   D6 (TX, Serial1)  -> SP3485, Richtung automatisch (TX low schaltet den Treiber ein)
 //   D7 (RX, Serial1)  <- RO des SP3485
 //   D0                -> 12-V-Versorgung der Sonde und des SP3485 (HIGH = an),

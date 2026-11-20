@@ -1,6 +1,6 @@
 // PC-Test der Sender-Treiber für die Trägerplatine (PEGEL_BOARD=1):
 // level_sensor.cpp gegen eine nachgebildete Modbus-Sonde an Serial1 (SP3485 mit automatischer Richtung),
-// battery.cpp gegen den nachgebildeten SAADC an VDD (Spannungen aus der SPICE-Simulation, hardware/pegel-sender/verify).
+// battery.cpp gegen den nachgebildeten SAADC an VDD (Spannungen aus der SPICE-Simulation, hardware/pegel-sender-12v/verify).
 //
 //   g++ -std=c++17 -DPEGEL_BOARD=1 -Imock -I../sender -I../common test_sender.cpp mock/sim.cpp
 //       ../sender/level_sensor.cpp ../sender/battery.cpp -o test_sender && ./test_sender

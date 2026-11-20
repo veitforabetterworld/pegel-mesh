@@ -1,0 +1,9 @@
+Designator,Wert,Teil,Footprint
+J1,5V IN,"Lötanschluss 2 x 2,54 mm",PinHeader_1x02_P2.54mm_Vertical
+J3,SONDE,"Lötanschluss 4 x 2,54 mm",PinHeader_1x04_P2.54mm_Vertical
+L1,10uH,"Bourns RLB0712-100KL (10 µH, 1,1 A)",L_Radial_D7.0mm_P3.00mm
+J5,XIAO D0-D6,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical
+J6,XIAO 5V-D7,"Buchsenleiste 1x7 2,54 mm",PinSocket_1x07_P2.54mm_Vertical
+J8,D12/D13,"Kurz an XIAO D12 (Ladepfad) und D13 (Heizung)","PinHeader_1x02_P2.54mm_Vertical"
+BP1,BAT+,"Lötpad unter XIAO BAT+",TestPoint_Pad_1.5x1.5mm
+BP2,BAT-,"Lötpad unter XIAO BAT-",TestPoint_Pad_1.5x1.5mm

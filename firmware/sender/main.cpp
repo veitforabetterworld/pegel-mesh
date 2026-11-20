@@ -29,6 +29,7 @@
 #if PEGEL_BOARD
   #include "battery.h"
 #endif
+#include "pegel_5v_power.h"
 #include PEGEL_SECRETS
 
 using namespace Adafruit_LittleFS_Namespace;
@@ -482,6 +483,9 @@ public:
 
   void loop() {
     wdtFeed();
+#if PEGEL_5V_BOARD
+    pegel_5v_power_update();
+#endif
     uptime64();
     if (radio_awake) mesh::Mesh::loop();
     uint32_t now = millis();
@@ -614,6 +618,9 @@ void setup() {
   qspiFlashSleep();
 #if PEGEL_BOARD
   battery_charger_begin();
+#endif
+#if PEGEL_5V_BOARD
+  pegel_5v_power_begin();
 #endif
   if (!sender_radio_init()) {
     while (1) { logf("radio init failed\n"); delay(2000); }
