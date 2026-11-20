@@ -246,10 +246,7 @@ def shove_text(text, start, pads, holes, taken, bodies=(), max_radius=13.0):
 
 # (Text, x, y, Höhe mm, Ausrichtung wie label(): 0 Mitte, -1 links, 1 rechts[, Winkel])
 BOARD_LABELS = [
-    ("XIAO+Wio UNTEN", 42.0, 15.6, 0.55, 0),
-    ("pegel-sender 5V", 20.0, 1.3, 0.6, 0),
-    ("J1 5V", 8.4, 4.6, 0.5, 0),
-    ("J3 RS485", 8.4, 17.2, 0.5, 0),
+    ("pegel-sender 5V", 29.0, 44.6, 0.7, 0),
 ]
 
 
@@ -468,7 +465,7 @@ def pin_labels(board, fps, pads=None, holes=None, taken=None, bodies=None):
             t = label(board, text, anchor, y, 0.75, align)
             if pads is not None:
                 if not place_field_text(t, (anchor, y), pads, holes, taken, bodies):
-                    shove_text(t, (anchor, y), pads, holes, taken, bodies, max_radius=6.0)
+                    shove_text(t, (anchor, y), pads, holes, taken, bodies, max_radius=2.2)
             else:
                 boxes.append(silk_reserve(item_box(t)))
     return boxes
