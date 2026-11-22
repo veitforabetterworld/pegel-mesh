@@ -1,0 +1,5 @@
+Designator,Wert,Teil,Footprint
+L1,10uH,"Sunlord SWPA3015S100MT (10 µH, Isat 0,9 A, LCSC C45403)",L_3015_HandSolder
+J3,SONDE,"Lötstellen durchkontaktiert, 2,54 mm: A, B, GND, 12 V",WirePads_1x04_P2.54mm_D1.0mm
+J5,XIAO D0-D6,Stapel-Buchsenleiste 1×7 mit langen Stiften,PinSocket_1x07_P2.54mm_Vertical
+J6,XIAO 5V-D7,Stapel-Buchsenleiste 1×7 mit langen Stiften,PinSocket_1x07_P2.54mm_Vertical

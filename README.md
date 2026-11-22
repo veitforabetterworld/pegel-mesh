@@ -10,6 +10,7 @@ Zwei Trägerplatinen, eine Firmware (gleiche XIAO-Pins; die Firmware erkennt den
 |---|---|---|
 | [`pegel-sender-12v`](hardware/pegel-sender-12v/README.md) (100 × 70 mm) | LiFePO4 oder ohne | Solarpanel 12-V-Klasse oder 12-V-Netzteil |
 | [`pegel-sender-5v`](hardware/pegel-sender-5v/README.md) (58 × 46 mm) | Li-Ionen oder ohne | USB-C-Netzteil oder USB-C-Solarpanel (5 V), Heizung 1,7 W |
+| [`pegel-stapel`](hardware/pegel-stapel/README.md) (Stapel) | wie oben | RS485-Platine auf Ladeplatine 5 V (beide 21 × 17,8 mm, wie der XIAO) oder 12 V (100 × 70 mm); Thermolader für 12-V-Netzteil und 12-V-Solar im Entwurf, noch unverdrahtet |
 
 ## Platine (12 V)
 

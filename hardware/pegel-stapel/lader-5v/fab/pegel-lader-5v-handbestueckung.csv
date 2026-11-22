@@ -1,0 +1,5 @@
+Designator,Wert,Teil,Footprint
+J1,5V IN,Lötpads unten: 5 V + GND,SolderPads_1x02_B_1.8x1.8mm_P2.54mm
+J4,NTC,"Lötpads unten: NTC 10 kΩ B3950, am Akku",SolderPads_1x02_B_1.8x1.8mm_P2.54mm
+J5,XIAO D0-D6,"Buchsenleiste 1×7, 8,5 mm",PinSocket_1x07_P2.54mm_Vertical
+J6,XIAO 5V-D7,"Buchsenleiste 1×7, 8,5 mm",PinSocket_1x07_P2.54mm_Vertical

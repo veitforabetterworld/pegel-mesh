@@ -1,0 +1,13 @@
+(footprint "SolderPads_1x02_B_1.8x1.8mm_P2.54mm"
+	(version 20241229)
+	(generator "pegel-stapel")
+	(layer "B.Cu")
+	(descr "Zwei Loetpads fuer Draehte auf der Unterseite, ohne Bohrung und ohne Paste")
+	(attr smd exclude_from_pos_files exclude_from_bom)
+	(property "Reference" "REF**" (at 0 -3 0) (layer "B.Fab")
+		(effects (font (size 1 1) (thickness 0.15)) (justify mirror)))
+	(property "Value" "VAL**" (at 0 3 0) (layer "B.Fab")
+		(effects (font (size 1 1) (thickness 0.15)) (justify mirror)))
+	(pad "1" smd roundrect (at 0 -1.27) (size 1.8 1.8) (layers "B.Cu" "B.Mask") (roundrect_rratio 0.15))
+	(pad "2" smd roundrect (at 0 1.27) (size 1.8 1.8) (layers "B.Cu" "B.Mask") (roundrect_rratio 0.15))
+)
