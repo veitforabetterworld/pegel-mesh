@@ -41,7 +41,7 @@ def base(label: str) -> Netlist:
 
 def inductor(n: Netlist):
     n.add("L1", "Device:L", "pegel:L_4030_HandSolder", "22uH", "Sunlord SWPA4030S220MT (22 µH, LCSC C83472)",
-          {"1": "BUCK_SW", "2": "V5"}, "buck", hand=True)
+          {"1": "BUCK_SW", "2": "V5"}, "buck", lcsc="C83472")
 
 
 def diodes(n: Netlist, tvs: str, tvs_lcsc: str):

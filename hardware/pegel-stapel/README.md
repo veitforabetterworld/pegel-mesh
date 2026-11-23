@@ -57,7 +57,7 @@ Prüfen und Fertigungsdaten (`<platine>/fab/`) samt 3D-Bildern (`<platine>/previ
 python tools/fab.py
 ```
 
-**Vor dem Bestellen, RS485-Platine:** Die Drehlage von Q6, Q8, D4, D5 und D7 im JLC-Viewer prüfen. L1 (LCSC C45403) wird nicht bestückt, von Hand löten.
+**Vor dem Bestellen, RS485-Platine:** Die Drehlage von Q6, Q8, D4, D5 und D7 im JLC-Viewer prüfen. L1 (LCSC C45403) wird von JLCPCB bestückt.
 
 **Offen, 12-V-Thermolader:** Netzteil: verdrahtet, 21,975 mm lang, GND beidseitig als Fläche ohne GND-Bahnen (mind. 0,3 mm breit; Rückstrompfade Eingang, Wandler und XIAO mind. 0,89 mm, Ausgangskondensator C7 zum XIAO 0,4 mm; VIN_RAW- und GND-Via sitzen in den Drahtpads J1.1/J1.2), Heizreihen (V5, HEAT_N) und Schaltknoten als Flächen, Signale 0,3 mm, Versorgung 0,6 mm, Ecken R 1,5 mm (stehen an den Ecken bis 0,17 mm über den XIAO). Solar: Teile wie am 5-V-Lader, der Wandler links von x = 0, noch ohne Leiterbahnen; `fab.py` exportiert erst nach dem Verdrahten. Gegenüber dem 5-V-Lader kleinere Gehäuse, alle Basic/Preferred: R1, R3–R6, R8, R9 und C1, C2, C4 in 0402, die Heizung in 0805 (je 0,08 W von 0,125 W), C3 in 0805; am Netzteil ein 47-µF-Ausgangskondensator statt zwei 22 µF. L1 (LCSC C83472) von Hand löten. Wärme nachgerechnet in [`verify/report/thermal-12v.md`](verify/report/thermal-12v.md): Fällt der NTC ab, erreicht der Akku 60 °C schon ab ~21 °C Außenluft (Solar) bzw. ~28 °C (Netzteil), weil die Wandlerverluste dazukommen. Die 0805-Heizung liegt dann beim Solar-Lader ab ~38 °C Außenluft über ihrer Lastminderung. Der Lader des XIAO bricht nach 10 h ab (~1 Ah bei 100 mA).
 

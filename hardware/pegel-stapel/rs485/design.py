@@ -42,7 +42,7 @@ g = "12v"
 add("U2", "Regulator_Switching:TPS61040DBV", "Package_TO_SOT_SMD:SOT-23-5", "TPS61040", "TI TPS61040DBVR",
     {"1": "BST_SW", "2": GND, "3": "BST_FB", "4": "V3_SW", "5": "V3_SW"}, g, lcsc="C7722")
 add("L1", "Device:L", L3015, "10uH", "Sunlord SWPA3015S100MT (10 µH, Isat 0,9 A, LCSC C45403)",
-    {"1": "V3_SW", "2": "BST_SW"}, g, hand=True)      # Leistungsspulen gibt es nur als Extended
+    {"1": "V3_SW", "2": "BST_SW"}, g, lcsc="C45403")      # Extended-Teil
 add("D4", "Device:D_Schottky", "Diode_SMD:D_SOD-323", "1N5819WS", "1N5819WS (40 V 1 A)",
     {"1": "V12_PROBE", "2": "BST_SW"}, g, lcsc="C191023")
 c("C5", "10uF 10V", "V3_SW", GND, g)
