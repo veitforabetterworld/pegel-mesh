@@ -16,7 +16,7 @@ r, c, add = N.r, N.c, N.add
 
 # --- Eingang: ein 25-V-Panel hat bei -25 C ~29 V, SMF28A bricht erst ab 31,1 V durch ---------------
 diodes(N, "SMF28A", "C41376091")
-c("C3", "10uF 50V", "VIN", GND, "input")
+c("C3", "10uF 50V 0805", "VIN", GND, "input")      # bei 25 V noch ~3 µF, die Panelregelung bleibt ab 2,5 µF ruhig
 c("C5", "100nF 50V 0402", "VIN", GND, "input")
 
 # --- Wandler: TI SLVS632L, nur Keramik am Ausgang ----------------------------------------------

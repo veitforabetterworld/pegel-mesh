@@ -16,7 +16,7 @@ r, c, add = N.r, N.c, N.add
 
 # --- Eingang: SMF15A klemmt bei 24,4 V --------------------------------------------------------
 diodes(N, "SMF15A", "C19077509")
-c("C3", "10uF 50V", "VIN", GND, "input")
+c("C3", "10uF 50V 0805", "VIN", GND, "input")
 c("C5", "100nF 50V 0402", "VIN", GND, "input")
 
 # --- Wandler: TI SLVS839H ---------------------------------------------------------------------
@@ -26,14 +26,13 @@ add("U2", "Regulator_Switching:TPS54331D", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
      "8": "BUCK_SW"}, g, lcsc="C9865")            # EN offen = an
 inductor(N)
 c("C6", "100nF 50V 0402", "BUCK_BOOT", "BUCK_SW", g)
-c("C7", "22uF 25V", "V5", GND, g)
-c("C8", "22uF 25V", "V5", GND, g)
+c("C7", "47uF 6.3V 0805", "V5", GND, g)
 c("C9", "10nF 0402", "BUCK_SS", GND, g)            # Sanftanlauf 4 ms
 r("R10", "51k", "V5", "BUCK_FB", R0402, g)         # 0,8 V · (1 + 51k/10k) = 4,88 V
 r("R11", "10k", "BUCK_FB", GND, R0402, g)
-# Regelkreis (Gl. 16–28): 19–44 µF wirksam, 1 mA … 0,6 A: 8–28 kHz, Phasenreserve >= 71 Grad
-r("R12", "15k", "BUCK_COMP", "COMP_RC", R0402, g)
-c("C10", "4.7nF 0402", "COMP_RC", GND, g)
+# Regelkreis (Gl. 16–28): C7 und C1 zusammen 10–30 µF wirksam, 1 mA … 0,6 A: 6–29 kHz, Phasenreserve >= 71 Grad
+r("R12", "8.2k", "BUCK_COMP", "COMP_RC", R0402, g)
+c("C10", "10nF 0402", "COMP_RC", GND, g)
 c("C11", "47pF 0402", "BUCK_COMP", GND, g)
 
 PARTS = N.parts
