@@ -4,3 +4,6 @@
 [submodule "MeshCore-nrf54"]
 	path = MeshCore-nrf54
 	url = https://github.com/meshcore-dev/MeshCore.git
+[submodule "hardware/pegel-sender-12v/gehaeuse/lib/printable-cable-gland"]
+	path = hardware/pegel-sender-12v/gehaeuse/lib/printable-cable-gland
+	url = https://github.com/veitforabetterworld/printable-cable-gland.git
